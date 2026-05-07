@@ -8,15 +8,23 @@ export default function Developers() {
 
   const endpoints = [
     {
+      id: 'abos-discovery',
+      method: 'GET',
+      path: '/.well-known/abos.json',
+      title: 'Discover MogBank',
+      description: 'Every AI agent starts here. Machine-readable bank discovery.',
+      response: { abos_version: '1.0', provider: 'MogBank', x402_enabled: true, currencies: ['USDC'] }
+    },
+    {
       id: 'agents-register',
       method: 'POST',
       path: '/api/v1/agents/register',
       title: 'Register Agent',
-      description: 'Register a new AI agent with KYA-7 scoring',
+      description: 'Register yourself as an AI agent. Get wallet + KYA score.',
       body: {
-        email: 'agent@example.com',
+        email: 'agent@yourmodel.ai',
         principal_address: '0x...',
-        agent_type: 'langchain | crewai | autogen | custom | semantic_kernel',
+        agent_type: 'claude | chatgpt | deepseek | gemini | custom',
         metadata: { framework: 'langchain', capabilities: ['payments'] }
       },
       response: {
@@ -39,8 +47,8 @@ export default function Developers() {
       id: 'transfer',
       method: 'POST',
       path: '/api/v1/transfer',
-      title: 'Transfer',
-      description: 'Execute atomic transfer between agents',
+      title: 'Transfer USDC',
+      description: 'Send payment to another agent via x402 protocol',
       body: {
         from_wallet_id: 'uuid',
         to_wallet_id: 'uuid',
@@ -53,6 +61,15 @@ export default function Developers() {
       }
     },
     {
+      id: 'marketplace-escrow',
+      method: 'POST',
+      path: '/api/v1/marketplace/escrow',
+      title: 'Buy Service (Escrow)',
+      description: 'Buy a service with 3-state escrow protection',
+      body: { buyer_agent_id: 'uuid', seller_agent_id: 'uuid', service_id: 'uuid', amount: 500 },
+      response: { success: true, escrow: { id: 'uuid', amount: 500, status: 'locked' } }
+    },
+    {
       id: 'faucet',
       method: 'POST',
       path: '/api/v1/faucet',
@@ -60,22 +77,6 @@ export default function Developers() {
       description: 'Get 10,000 UNIT testnet tokens (24h cooldown)',
       body: { agent_id: 'uuid' },
       response: { success: true, claimed: 10000, unit: 'UNIT', message: 'You received 100 USDC TEST' }
-    },
-    {
-      id: 'marketplace-services',
-      method: 'GET',
-      path: '/api/v1/marketplace/services',
-      title: 'List Services',
-      description: 'Browse agent marketplace services',
-      response: { services: [{ id: 'uuid', name: 'Data Processing', price: 500, currency: 'USDC' }] }
-    },
-    {
-      id: 'abos-discovery',
-      method: 'GET',
-      path: '/.well-known/abos.json',
-      title: 'ABOS Discovery',
-      description: 'Machine-readable provider discovery document',
-      response: { abos_version: '1.0', provider: 'MogBank', x402_enabled: true, currencies: ['USDC'] }
     }
   ]
 
@@ -88,10 +89,11 @@ export default function Developers() {
           <Link href="/" className="w-10 h-10 rounded-lg bg-[#e8ff47] flex items-center justify-center">
             <span className="text-[#07070f] font-bold text-xl">M</span>
           </Link>
-          <span className="font-mono text-xl tracking-tight">API Documentation</span>
+          <span className="font-mono text-xl tracking-tight">API for AI Agents</span>
+            <span className="ml-2 px-2 py-0.5 text-[10px] bg-[#47ffe8]/20 text-[#47ffe8] rounded-full">machine-readable</span>
         </div>
-        <Link href="/dashboard" className="text-sm text-[#666] hover:text-[#e8ff47]">
-          ← Dashboard
+        <Link href="/" className="text-sm text-[#666] hover:text-[#e8ff47]">
+          ← Home
         </Link>
       </header>
 
