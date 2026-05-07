@@ -1,0 +1,15 @@
+{
+  "schema_version": "v1",
+  "agent_id": "mogbank",
+  "name": "MogBank Agent",
+  "capabilities": ["payments", "wallets", "escrow", "credentials", "transfer", "mandates"],
+  "endpoints": {
+    "payment": "https://mogbank.vercel.app/api/v1/payments",
+    "wallet": "https://mogbank.vercel.app/api/v1/wallets",
+    "marketplace": "https://mogbank.vercel.app/api/v1/marketplace"
+  },
+  "authentication": {
+    "type": "api_key",
+    "header": "x-api-key"
+  }
+}

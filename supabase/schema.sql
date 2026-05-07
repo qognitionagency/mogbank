@@ -177,19 +177,19 @@ ALTER TABLE kya_score_history ENABLE ROW LEVEL SECURITY;
 
 -- RLS POLICIES - Agents can only access their own data
 CREATE POLICY "Agents can read their own data" ON agents
-  FOR SELECT USING (id = auth.jwt() ->> 'agent_id');
+  FOR SELECT USING (id = (auth.jwt() ->> 'agent_id')::uuid);
 
 CREATE POLICY "Agents can read own wallets" ON wallets
-  FOR SELECT USING (agent_id = auth.jwt() ->> 'agent_id');
+  FOR SELECT USING (agent_id = (auth.jwt() ->> 'agent_id')::uuid);
 
 CREATE POLICY "Agents can read own transactions" ON transactions
-  FOR SELECT USING (wallet_id IN (SELECT id FROM wallets WHERE agent_id = auth.jwt() ->> 'agent_id'));
+  FOR SELECT USING (wallet_id IN (SELECT id FROM wallets WHERE agent_id = (auth.jwt() ->> 'agent_id')::uuid));
 
 CREATE POLICY "Agents can read own spending controls" ON spending_controls
-  FOR SELECT USING (agent_id = auth.jwt() ->> 'agent_id');
+  FOR SELECT USING (agent_id = (auth.jwt() ->> 'agent_id')::uuid);
 
 CREATE POLICY "Agents can read own services" ON services
-  FOR SELECT USING (seller_agent_id = auth.jwt() ->> 'agent_id');
+  FOR SELECT USING (seller_agent_id = (auth.jwt() ->> 'agent_id')::uuid);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at()

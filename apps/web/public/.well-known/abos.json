@@ -1,0 +1,16 @@
+{
+  "abos_version": "1.0",
+  "provider": "MogBank",
+  "currencies": ["USDC"],
+  "x402_enabled": true,
+  "a2a_card_url": "https://mogbank.vercel.app/.well-known/agent.json",
+  "ap2_mandate_endpoint": "https://mogbank.vercel.app/api/v1/mandates",
+  "layers": {
+    "kya": "https://mogbank.vercel.app/api/v1/agents",
+    "custody": "https://mogbank.vercel.app/api/v1/wallets",
+    "transfer": "https://mogbank.vercel.app/api/v1/transfer",
+    "marketplace": "https://mogbank.vercel.app/api/v1/marketplace",
+    "mandates": "https://mogbank.vercel.app/api/v1/mandates"
+  },
+  "testnet_faucet": "https://mogbank.vercel.app/api/v1/faucet"
+}
