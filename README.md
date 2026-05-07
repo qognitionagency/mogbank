@@ -27,14 +27,6 @@ Run the schema in Supabase SQL Editor:
 
 ### 3. Configure Environment Variables
 
-In Vercel dashboard, add these environment variables:
-
-```
-NEXT_PUBLIC_SUPABASE_URL=https://mkushvohaysmlrbdwcom.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_mzMmZ4y6xfkoagO3DeSOOQ_JK0OfWpR
-SUPABASE_SERVICE_ROLE_KEY=sb_secret_DMmPJOPJEZmdTnGtA9NZgQ_c0eTdU4P
-```
-
 ---
 
 ## 🏗️ Architecture
