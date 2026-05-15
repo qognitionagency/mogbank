@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "langchain-mogbank"
+version = "1.0.0"
+description = "LangChain integration for MogBank — AI Agent Banking Toolkit"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "MogBank Team", email = "dev@mogbank.dev"}
+]
+keywords = ["langchain", "mogbank", "ai-agents", "agent-banking", "usdc"]
+
+dependencies = [
+    "langchain>=0.2.0",
+    "langchain-core>=0.2.0",
+    "mogbank>=1.0.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

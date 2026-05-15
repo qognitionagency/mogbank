@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mogbank-backend
+  namespace: mogbank
+  labels:
+    app: mogbank
+    component: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: mogbank
+    component: backend
+  ports:
+    - name: http
+      port: 3001
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mogbank-web
+  namespace: mogbank
+  labels:
+    app: mogbank
+    component: web
+spec:
+  type: ClusterIP
+  selector:
+    app: mogbank
+    component: web
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mogbank-postgres
+  namespace: mogbank
+  labels:
+    app: mogbank
+    component: postgres
+spec:
+  type: ClusterIP
+  selector:
+    app: mogbank
+    component: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mogbank-redis
+  namespace: mogbank
+  labels:
+    app: mogbank
+    component: redis
+spec:
+  type: ClusterIP
+  selector:
+    app: mogbank
+    component: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+      protocol: TCP

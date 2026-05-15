@@ -42,6 +42,18 @@ export const config = {
     maxRequests: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
   },
 
+  faucet: {
+    defaultAmount: parseFloat(process.env.FAUCET_DEFAULT_AMOUNT || '100'),
+    dailyLimit: parseFloat(process.env.FAUCET_DAILY_LIMIT || '500'),
+    usdcFaucet: process.env.FAUCET_USDC_ENABLED !== 'false',
+  },
+
+  ddsc: {
+    enabled: process.env.DDSC_ENABLED === 'true',
+    endpoint: process.env.DDSC_ENDPOINT || 'https://ddsc.mainnet.base.org',
+    contractAddress: process.env.DDSC_CONTRACT || '0xDDSC',
+  },
+
   logging: {
     level: process.env.LOG_LEVEL || 'info',
   },

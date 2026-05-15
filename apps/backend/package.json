@@ -16,21 +16,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@apollo/server": "^4.10.0",
-    "@mogbank/shared": "*",
     "cors": "^2.8.5",
     "dotenv": "^16.4.1",
     "express": "^4.18.2",
-    "graphql": "^16.8.1",
-    "graphql-tag": "^2.12.6",
     "helmet": "^7.1.0",
     "morgan": "^1.10.0",
     "pg": "^8.11.3",
     "rate-limiter-flexible": "^5.0.0",
     "redis": "^4.6.12",
+    "tweetnacl": "^1.0.3",
     "uuid": "^9.0.1",
     "ws": "^8.16.0",
-    "x402": "^1.0.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
@@ -38,6 +34,7 @@
     "@types/express": "^4.17.21",
     "@types/morgan": "^1.9.9",
     "@types/node": "^20.11.5",
+    "@types/pg": "^8.10.9",
     "@types/uuid": "^9.0.7",
     "@types/ws": "^8.5.10",
     "@typescript-eslint/eslint-plugin": "^6.19.0",

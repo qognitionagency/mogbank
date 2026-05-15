@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mogbank
+  labels:
+    app.kubernetes.io/part-of: mogbank
+    app.kubernetes.io/managed-by: terraform

@@ -1,0 +1,369 @@
+name: MogBank CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: "20"
+  PNPM_VERSION: "9"
+
+jobs:
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project: [apps/backend, apps/web, packages/shared, packages/typescript-sdk]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Type check ${{ matrix.project }}
+        run: pnpm --filter "./${{ matrix.project }}" run typecheck
+
+      - name: Lint ${{ matrix.project }}
+        run: pnpm --filter "./${{ matrix.project }}" run lint
+
+  test-backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run backend tests
+        run: pnpm --filter "./apps/backend" run test --coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          directory: apps/backend/coverage
+          flags: backend
+
+  test-web:
+    name: Web App Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run web tests
+        run: pnpm --filter "./apps/web" run test --coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          directory: apps/web/coverage
+          flags: web
+
+  test-sdk:
+    name: TypeScript SDK Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run SDK tests
+        run: pnpm --filter "./packages/typescript-sdk" run test
+
+  test-python:
+    name: Python SDK Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          [packages/python-sdk, packages/langchain-mogbank, packages/crewai-mogbank, packages/autogen-mogbank]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ${{ matrix.package }}
+        run: pip install "./${{ matrix.package }}[dev]"
+
+      - name: Run tests
+        run: cd ${{ matrix.package }} && pytest --cov
+
+  security-audit:
+    name: Security Audit & SAST
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run npm audit (backend)
+        run: cd apps/backend && npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Run npm audit (web)
+        run: cd apps/web && npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Run pip-audit (Python packages)
+        run: |
+          pip install pip-audit
+          pip-audit -r packages/python-sdk/requirements.txt || true
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript, typescript, python
+          queries: security-extended,security-and-quality
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:javascript,typescript,python
+
+  secret-scanning:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.before }}
+          head: ${{ github.sha }}
+          extra_args: --only-verified
+
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+  build:
+    name: Build & Sign Docker Images
+    needs: [test-backend, test-web, test-sdk, security-audit, secret-scanning]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Build & push backend
+        id: build-backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/backend/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}/backend:${{ github.sha }},ghcr.io/${{ github.repository }}/backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
+
+      - name: Sign backend image
+        run: |
+          cosign sign --yes \
+            ghcr.io/${{ github.repository }}/backend@${{ steps.build-backend.outputs.digest }}
+
+      - name: Build & push web
+        id: build-web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}/web:${{ github.sha }},ghcr.io/${{ github.repository }}/web:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
+
+      - name: Sign web image
+        run: |
+          cosign sign --yes \
+            ghcr.io/${{ github.repository }}/web@${{ steps.build-web.outputs.digest }}
+
+  container-scan:
+    name: Container Vulnerability Scan
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Trivy on backend image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+          format: sarif
+          output: trivy-backend.sarif
+          severity: CRITICAL,HIGH
+          exit-code: 1
+
+      - name: Run Trivy on web image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/${{ github.repository }}/web:${{ github.sha }}
+          format: sarif
+          output: trivy-web.sarif
+          severity: CRITICAL,HIGH
+          exit-code: 1
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-backend.sarif
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: critical
+          deny-licenses: GPL-2.0-only, GPL-3.0-only
+
+  deploy-staging:
+    name: Deploy Staging
+    needs: [container-scan]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Auth to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER }} \
+            --region ${{ secrets.GCP_REGION }}
+
+      - name: Deploy backend
+        run: |
+          kubectl set image deployment/mogbank-backend \
+            backend=ghcr.io/${{ github.repository }}/backend:${{ github.sha }} \
+            -n mogbank-staging
+
+      - name: Deploy web
+        run: |
+          kubectl set image deployment/mogbank-web \
+            web=ghcr.io/${{ github.repository }}/web:${{ github.sha }} \
+            -n mogbank-staging
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/mogbank-backend -n mogbank-staging --timeout=300s
+          kubectl rollout status deployment/mogbank-web -n mogbank-staging --timeout=300s
+
+  deploy-production:
+    name: Deploy Production
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Auth to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER }} \
+            --region ${{ secrets.GCP_REGION }}
+
+      - name: Deploy backend
+        run: |
+          kubectl set image deployment/mogbank-backend \
+            backend=ghcr.io/${{ github.repository }}/backend:${{ github.sha }} \
+            -n mogbank
+
+      - name: Deploy web
+        run: |
+          kubectl set image deployment/mogbank-web \
+            web=ghcr.io/${{ github.repository }}/web:${{ github.sha }} \
+            -n mogbank
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/mogbank-backend -n mogbank --timeout=300s
+          kubectl rollout status deployment/mogbank-web -n mogbank --timeout=300s
+
+      - name: Health check
+        run: |
+          curl -f -s -o /dev/null -w "%{http_code}" https://api.mogbank.io/health || \
+            (echo "Health check failed" && exit 1)

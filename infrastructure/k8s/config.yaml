@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mogbank-config
+  namespace: mogbank
+  labels:
+    app: mogbank
+data:
+  # Base L2 Configuration
+  BASE_RPC_URL: "https://mainnet.base.org"
+  USDC_CONTRACT_ADDRESS: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+  DDSC_CONTRACT_ADDRESS: "0x0000000000000000000000000000000000000000"
+
+  # Application defaults
+  MAX_AGENTS_PER_USER: "50"
+  FAUCET_DAILY_LIMIT: "100"
+  FAUCET_AMOUNT: "10"
+  KYA_MIN_SCORE: "30"
+
+  # x402 Protocol
+  X402_FEE_COLLECTOR: "0x0000000000000000000000000000000000000000"
+  X402_DEFAULT_CREDITS: "100"
+
+  # Streaming
+  STREAM_MAX_CLIENTS_PER_AGENT: "1000"
+
+  # DDSC
+  DDSC_MAX_AGENTS: "1000000"
+  DDSC_DEFAULT_CDP_DEBT: "0"
+  DDSC_GLOBAL_CDP_LIMIT: "100000000000"
+
+  # Idempotency
+  IDEMPOTENCY_KEY_TTL_SECONDS: "86400"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mogbank-web-config
+  namespace: mogbank
+  labels:
+    app: mogbank
+    component: web
+data:
+  NEXT_PUBLIC_API_URL: "https://api.mogbank.io"
+  NEXT_PUBLIC_BASE_EXPLORER: "https://basescan.org"

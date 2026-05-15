@@ -1,0 +1,100 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mogbank-postgres
+    environment:
+      POSTGRES_USER: mogbank
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mogbank_dev}
+      POSTGRES_DB: mogbank
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./supabase/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mogbank"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - mogbank
+
+  redis:
+    image: redis:7-alpine
+    container_name: mogbank-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - mogbank
+
+  supabase-studio:
+    image: supabase/studio:latest
+    container_name: mogbank-supabase-studio
+    environment:
+      SUPABASE_URL: http://localhost:8000
+      SUPABASE_KEY: ${SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0}
+    ports:
+      - "3000:3000"
+    networks:
+      - mogbank
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: mogbank-backend
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://mogbank:${DB_PASSWORD:-mogbank_dev}@postgres:5432/mogbank
+      REDIS_URL: redis://redis:6379
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      BASE_RPC_URL: ${BASE_RPC_URL:-https://mainnet.base.org}
+      USDC_CONTRACT_ADDRESS: ${USDC_CONTRACT_ADDRESS:-0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913}
+      DDSC_CONTRACT_ADDRESS: ${DDSC_CONTRACT_ADDRESS:-0x0000000000000000000000000000000000000000}
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - mogbank
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: mogbank-web
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      BACKEND_API_URL: http://backend:3001
+    ports:
+      - "3002:3000"
+    depends_on:
+      - backend
+    networks:
+      - mogbank
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  mogbank:
+    driver: bridge
