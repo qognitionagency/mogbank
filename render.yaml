@@ -15,15 +15,15 @@ services:
         value: production
       - key: PORT
         value: "3001"
-      - key: DATABASE_HOST
+      - key: DB_HOST
         sync: false
-      - key: DATABASE_PORT
+      - key: DB_PORT
         value: "5432"
-      - key: DATABASE_NAME
+      - key: DB_NAME
         sync: false
-      - key: DATABASE_USER
+      - key: DB_USER
         sync: false
-      - key: DATABASE_PASSWORD
+      - key: DB_PASSWORD
         sync: false
       - key: REDIS_HOST
         sync: false
@@ -35,9 +35,9 @@ services:
         value: "https://mogbank.vercel.app,https://mogbank.vercel.app"
       - key: X402_ENABLED
         value: "true"
-      - key: BLOCKCHAIN_RPC_URL
+      - key: ETH_RPC_URL
         sync: false
-      - key: BLOCKCHAIN_CHAIN_ID
+      - key: ETH_CHAIN_ID
         value: "8453"
       - key: DDSC_ENABLED
         value: "false"

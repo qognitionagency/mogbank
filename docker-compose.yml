@@ -55,13 +55,17 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      DATABASE_URL: postgresql://mogbank:${DB_PASSWORD:-mogbank_dev}@postgres:5432/mogbank
-      REDIS_URL: redis://redis:6379
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
-      BASE_RPC_URL: ${BASE_RPC_URL:-https://mainnet.base.org}
-      USDC_CONTRACT_ADDRESS: ${USDC_CONTRACT_ADDRESS:-0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913}
-      DDSC_CONTRACT_ADDRESS: ${DDSC_CONTRACT_ADDRESS:-0x0000000000000000000000000000000000000000}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: mogbank
+      DB_USER: mogbank
+      DB_PASSWORD: ${DB_PASSWORD:-mogbank_dev}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ETH_RPC_URL: ${ETH_RPC_URL:-https://mainnet.base.org}
+      USDC_ADDRESS: ${USDC_ADDRESS:-0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913}
+      DDSC_ENABLED: "false"
+      DDSC_CONTRACT: ${DDSC_CONTRACT:-0x0000000000000000000000000000000000000000}
     ports:
       - "3001:3001"
     depends_on:

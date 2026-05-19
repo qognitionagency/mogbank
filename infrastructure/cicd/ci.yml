@@ -8,7 +8,6 @@ on:
 
 env:
   NODE_VERSION: "20"
-  PNPM_VERSION: "9"
 
 jobs:
   lint:
@@ -20,22 +19,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v3
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: "pnpm"
+          cache: "npm"
 
-      - run: pnpm install --frozen-lockfile
+      - run: npm ci
 
       - name: Type check ${{ matrix.project }}
-        run: pnpm --filter "./${{ matrix.project }}" run typecheck
+        run: cd ${{ matrix.project }} && npm run typecheck
 
       - name: Lint ${{ matrix.project }}
-        run: pnpm --filter "./${{ matrix.project }}" run lint
+        run: cd ${{ matrix.project }} && npm run lint
 
   test-backend:
     name: Backend Tests
@@ -43,19 +38,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v3
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: "pnpm"
+          cache: "npm"
 
-      - run: pnpm install --frozen-lockfile
+      - run: cd apps/backend && npm ci
 
       - name: Run backend tests
-        run: pnpm --filter "./apps/backend" run test --coverage
+        run: cd apps/backend && npm run test -- --coverage
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -69,19 +60,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v3
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: "pnpm"
+          cache: "npm"
 
-      - run: pnpm install --frozen-lockfile
+      - run: cd apps/web && npm ci
 
       - name: Run web tests
-        run: pnpm --filter "./apps/web" run test --coverage
+        run: cd apps/web && npm run test -- --coverage
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -95,19 +82,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v3
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: "pnpm"
+          cache: "npm"
 
-      - run: pnpm install --frozen-lockfile
+      - run: cd packages/typescript-sdk && npm ci
 
       - name: Run SDK tests
-        run: pnpm --filter "./packages/typescript-sdk" run test
+        run: cd packages/typescript-sdk && npm run test
 
   test-python:
     name: Python SDK Tests
