@@ -197,6 +197,10 @@ app.get('/abos', (_req, res) => {
   });
 });
 
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 app.get('/.well-known/abos', (_req, res) => {
   res.json({
     protocol: 'ABOS v1.0',

@@ -1,0 +1,44 @@
+# Render Blueprint — deploy apps/backend with one click
+# https://render.com/docs/blueprint-spec
+
+services:
+  - name: mogbank-api
+    type: web
+    env: docker
+    region: singapore
+    plan: starter
+    dockerContext: .
+    dockerfilePath: apps/backend/Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3001"
+      - key: DATABASE_HOST
+        sync: false
+      - key: DATABASE_PORT
+        value: "5432"
+      - key: DATABASE_NAME
+        sync: false
+      - key: DATABASE_USER
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PORT
+        value: "6379"
+      - key: REDIS_PASSWORD
+        sync: false
+      - key: CORS_ORIGINS
+        value: "https://mogbank.vercel.app,https://mogbank.vercel.app"
+      - key: X402_ENABLED
+        value: "true"
+      - key: BLOCKCHAIN_RPC_URL
+        sync: false
+      - key: BLOCKCHAIN_CHAIN_ID
+        value: "8453"
+      - key: DDSC_ENABLED
+        value: "false"
+    autoDeploy: true
