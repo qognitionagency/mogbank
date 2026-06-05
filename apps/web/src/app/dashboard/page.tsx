@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
 import { TopNav, KyaRadar, StatCard, Badge } from '@/components/ui'
 
 interface AgentInfo {
@@ -54,6 +53,15 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'scoring', label: 'KYA-7 Score' },
 ]
 
+type RegStep = 'form' | 'submitting' | 'credentials'
+
+interface RegResult {
+  agent: { id: string; kya_score: number; kya_status: string; wallet_address: string; public_key: string }
+  credentials: { api_key: string; ed25519_private_key: string; warning: string }
+  wallet: { id: string; balance: number; currency: string } | null
+  kya_breakdown: Record<string, number>
+}
+
 export default function Dashboard() {
   const [agent, setAgent] = useState<AgentInfo | null>(null)
   const [wallet, setWallet] = useState<WalletInfo | null>(null)
@@ -63,6 +71,18 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
   const [wsStatus, setWsStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected')
   const [balance, setBalance] = useState<number | null>(null)
+
+  // Registration flow
+  const [regStep, setRegStep] = useState<RegStep>('form')
+  const [regForm, setRegForm] = useState({
+    email: '',
+    principal_address: '',
+    agent_type: 'custom',
+    agent_name: '',
+  })
+  const [regResult, setRegResult] = useState<RegResult | null>(null)
+  const [regError, setRegError] = useState<string | null>(null)
+  const [copied, setCopied] = useState<Record<string, boolean>>({})
 
   const fetchAgentData = useCallback(async () => {
     const storedAgent = localStorage.getItem('mogbank_agent')
@@ -164,24 +184,203 @@ export default function Dashboard() {
     )
   }
 
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setRegStep('submitting')
+    setRegError(null)
+    try {
+      const res = await fetch('/api/v1/agents/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: regForm.email,
+          principal_address: regForm.principal_address,
+          agent_type: regForm.agent_type,
+          metadata: regForm.agent_name ? { model_name: regForm.agent_name } : {},
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        setRegError(data.error || 'Registration failed')
+        setRegStep('form')
+        return
+      }
+      setRegResult(data)
+      setRegStep('credentials')
+    } catch {
+      setRegError('Network error — please try again')
+      setRegStep('form')
+    }
+  }
+
+  const copyField = (key: string, value: string) => {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(prev => ({ ...prev, [key]: true }))
+      setTimeout(() => setCopied(prev => ({ ...prev, [key]: false })), 2000)
+    })
+  }
+
+  const finishRegistration = () => {
+    if (!regResult) return
+    localStorage.setItem('mogbank_agent', JSON.stringify({ id: regResult.agent.id }))
+    setLoading(true)
+    fetchAgentData()
+  }
+
   if (!agent) {
     return (
       <div className="mog-bg min-h-screen text-[#d0d0e0]">
         <TopNav />
-        <div className="mx-auto max-w-2xl px-6 pt-24 text-center">
-          <div className="mog-reveal mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-full border border-[#1a1a2e] bg-[#e8ff47]/10">
-            <span className="text-5xl">🤖</span>
-          </div>
-          <h1 className="mog-reveal font-display text-4xl font-bold tracking-tight" style={{ animationDelay: '80ms' }}>
-            Agent Dashboard
-          </h1>
-          <p className="mog-reveal mt-4 text-[#6c6c84]" style={{ animationDelay: '160ms' }}>
-            Register your AI agent to access the dashboard. Monitor balances, track transactions, and view your KYA-7 trust score.
-          </p>
-          <div className="mog-reveal mt-8 flex justify-center gap-4" style={{ animationDelay: '240ms' }}>
-            <Link href="/developers" className="mog-btn mog-btn-primary">Register Agent</Link>
-            <Link href="/" className="mog-btn mog-btn-ghost">Learn More</Link>
-          </div>
+        <div className="mx-auto max-w-lg px-6 py-16">
+
+          {/* Credentials step — shown after successful registration */}
+          {regStep === 'credentials' && regResult && (
+            <div className="mog-reveal">
+              <div className="mb-8 text-center">
+                <div className="mog-pop mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[#47ffe8]/30 bg-[#47ffe8]/10">
+                  <span className="text-3xl">🔑</span>
+                </div>
+                <h1 className="font-display text-3xl font-bold tracking-tight">Save Your Credentials</h1>
+                <p className="mt-2 font-mono-ds text-sm text-[#ff6b47]">
+                  These are shown exactly once and cannot be recovered.
+                </p>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                {[
+                  { key: 'api_key', label: 'API Key', value: regResult.credentials.api_key, color: '#e8ff47' },
+                  { key: 'ed25519', label: 'Ed25519 Private Key', value: regResult.credentials.ed25519_private_key, color: '#47ffe8' },
+                  { key: 'agent_id', label: 'Agent ID', value: regResult.agent.id, color: '#b347ff' },
+                ].map(field => (
+                  <div key={field.key} className="mog-card-quiet p-4">
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="font-mono-ds text-[0.65rem] uppercase tracking-widest text-[#6c6c84]">{field.label}</span>
+                      <button
+                        onClick={() => copyField(field.key, field.value)}
+                        className="font-mono-ds text-[0.65rem] text-[#6c6c84] hover:text-[#d0d0e0] transition-colors"
+                      >
+                        {copied[field.key] ? '✓ Copied' : 'Copy'}
+                      </button>
+                    </div>
+                    <code className="block break-all font-mono-ds text-xs" style={{ color: field.color }}>
+                      {field.value}
+                    </code>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mog-card-quiet mb-6 p-4 border-[#e8ff47]/20" style={{ borderColor: 'rgba(232,255,71,0.2)' }}>
+                <div className="flex gap-3 items-start">
+                  <span className="text-[#e8ff47] font-mono-ds text-lg leading-none mt-0.5">!</span>
+                  <div className="font-mono-ds text-xs text-[#888] leading-relaxed">
+                    <strong className="text-[#e8ff47]">KYA-7 Score:</strong>{' '}
+                    <span style={{ color: regResult.agent.kya_score >= 60 ? '#47ffe8' : '#ff6b47' }}>
+                      {regResult.agent.kya_score}/100
+                    </span>{' '}
+                    · Status: <span style={{ color: regResult.agent.kya_status === 'verified' ? '#47ffe8' : '#ffb347' }}>
+                      {regResult.agent.kya_status}
+                    </span>
+                    <br />Your wallet starts at $0.00 USDC. Visit the faucet to claim 100 TEST USDC.
+                  </div>
+                </div>
+              </div>
+
+              <button onClick={finishRegistration} className="mog-btn mog-btn-primary w-full">
+                I&apos;ve saved my credentials → Open Dashboard
+              </button>
+            </div>
+          )}
+
+          {/* Registration form */}
+          {(regStep === 'form' || regStep === 'submitting') && (
+            <div className="mog-reveal">
+              <div className="mb-8 text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[#1a1a2e] bg-[#e8ff47]/10">
+                  <span className="text-3xl">🤖</span>
+                </div>
+                <h1 className="font-display text-3xl font-bold tracking-tight">Register Your Agent</h1>
+                <p className="mt-2 font-mono-ds text-sm text-[#6c6c84]">
+                  One POST request. Bank account created. KYA-7 scored instantly.
+                </p>
+              </div>
+
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div>
+                  <label className="block font-mono-ds text-[0.65rem] uppercase tracking-widest text-[#6c6c84] mb-2">
+                    Agent Email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    className="mog-input"
+                    placeholder="agent@yourmodel.ai"
+                    value={regForm.email}
+                    onChange={e => setRegForm(f => ({ ...f, email: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-mono-ds text-[0.65rem] uppercase tracking-widest text-[#6c6c84] mb-2">
+                    Principal Address
+                    <span className="ml-2 normal-case text-[#444]">— your wallet / signing address</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="mog-input"
+                    placeholder="0x... (Ethereum / Base L2 address)"
+                    value={regForm.principal_address}
+                    onChange={e => setRegForm(f => ({ ...f, principal_address: e.target.value }))}
+                  />
+                  <p className="mt-1 font-mono-ds text-[0.6rem] text-[#444]">
+                    Testnet: any 0x address works. Use 0x0000000000000000000000000000000000000000 if you don&apos;t have one.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block font-mono-ds text-[0.65rem] uppercase tracking-widest text-[#6c6c84] mb-2">
+                    Agent Type
+                  </label>
+                  <select
+                    className="mog-input"
+                    value={regForm.agent_type}
+                    onChange={e => setRegForm(f => ({ ...f, agent_type: e.target.value }))}
+                  >
+                    {['claude', 'chatgpt', 'gemini', 'deepseek', 'llama', 'grok', 'mistral', 'custom'].map(t => (
+                      <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-mono-ds text-[0.65rem] uppercase tracking-widest text-[#6c6c84] mb-2">
+                    Agent Name <span className="normal-case text-[#444]">— optional</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="mog-input"
+                    placeholder="e.g. My Research Agent"
+                    value={regForm.agent_name}
+                    onChange={e => setRegForm(f => ({ ...f, agent_name: e.target.value }))}
+                  />
+                </div>
+
+                {regError && (
+                  <div className="mog-pop rounded-xl border border-[#ff6b47]/30 bg-[#ff6b47]/10 p-3 font-mono-ds text-sm text-[#ff6b47]">
+                    {regError}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={regStep === 'submitting'}
+                  className="mog-btn mog-btn-primary w-full disabled:opacity-50"
+                >
+                  {regStep === 'submitting' ? 'Registering agent…' : 'Register Agent & Get Wallet'}
+                </button>
+              </form>
+            </div>
+          )}
         </div>
       </div>
     )
