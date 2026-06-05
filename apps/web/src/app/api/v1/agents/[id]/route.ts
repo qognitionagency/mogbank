@@ -16,7 +16,8 @@ export async function GET(
       .select(`
         *,
         wallets (*),
-        spending_controls (*)
+        spending_controls (*),
+        kya_score_history (*)
       `)
       .eq('id', id)
       .single()
