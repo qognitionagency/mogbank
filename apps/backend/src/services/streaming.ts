@@ -47,6 +47,20 @@ const subscriptions = new Map<string, (SSEConnection | WSConnection)[]>();
 let wss: WebSocketServer | null = null;
 
 /**
+ * Attach the streaming service to an already-created WebSocketServer.
+ *
+ * index.ts owns the single WebSocketServer bound to the HTTP server (path
+ * /ws). We attach to it rather than creating a second WebSocketServer on the
+ * same HTTP server — two ws servers with the `server` option both intercept
+ * the upgrade event and abort each other's connections. SSE broadcasts use
+ * the `subscriptions` map (populated via handleSSEConnection).
+ */
+export function initStreaming(wsServer: WebSocketServer): void {
+  wss = wsServer;
+  logger.info('Streaming service attached to WebSocket server');
+}
+
+/**
  * Initialize streaming service with an HTTP server.
  * Attaches both SSE and WebSocket handlers.
  */

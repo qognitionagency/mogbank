@@ -39,16 +39,21 @@ export async function transferUsdc(req: Request, res: Response): Promise<void> {
     throw new AppError(400, 'SAME_WALLET', 'Cannot transfer to the same wallet');
   }
 
-  // Verify mandate if provided
+  // Verify mandate if provided. The mandate is signed by the agent's Ed25519
+  // key (Layer 6), so we verify against the sending agent's public key — not
+  // the wallet id. Resolve the public key via wallet → agent.
   if (mandate) {
-    const { mandate_id, signature, payload } = mandate;
-    if (mandate_id && signature && payload) {
-      const payloadBytes = new TextEncoder().encode(JSON.stringify(payload));
-      const valid = await verifyMandateSignature(
-        payloadBytes,
-        signature,
-        from_wallet_id
+    const { signature, payload } = mandate;
+    if (signature && payload) {
+      const { rows: [row] } = await query(
+        `SELECT a.public_key
+         FROM wallets w JOIN agents a ON a.id = w.agent_id
+         WHERE w.id = $1`,
+        [from_wallet_id]
       );
+      const valid = row?.public_key
+        ? await verifyMandateSignature(payload, signature, row.public_key)
+        : false;
       if (!valid) {
         throw new AppError(401, 'INVALID_MANDATE', 'Mandate signature verification failed');
       }
