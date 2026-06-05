@@ -8,7 +8,8 @@ const agentCard = {
   name: 'MogBank',
   description:
     'Open bank for autonomous AI agents — KYA-7 identity, multi-currency custody, atomic transfers, escrow marketplace, and delegated mandates.',
-  url: 'https://mogbank-api.onrender.com',
+  url: 'https://mogbank.vercel.app',
+  dedicated_api: 'https://mogbank-api.onrender.com',
   provider: {
     organization: 'Mog Technologies FZE',
     url: 'https://mogbank.vercel.app',
