@@ -1,21 +1,22 @@
-# Render Blueprint — deploy apps/backend with one click
+# Render Blueprint — native Node.js (no Docker)
 # https://render.com/docs/blueprint-spec
 
 services:
   - name: mogbank-api
     type: web
-    env: docker
+    env: node
     region: singapore
-    plan: starter
-    dockerContext: .
-    dockerfilePath: apps/backend/Dockerfile
+    plan: free
+    rootDir: apps/backend
+    buildCommand: npm install && npm run build
+    startCommand: node dist/index.js
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: "3001"
-      # Supabase connection pooler (transaction mode) — Singapore region
+        value: "10000"
+      # Supabase connection pooler (transaction mode)
       - key: DB_HOST
         value: "aws-0-ap-southeast-1.pooler.supabase.com"
       - key: DB_PORT
@@ -25,10 +26,10 @@ services:
       - key: DB_USER
         value: "postgres.mkushvohaysmlrbdwcom"
       - key: DB_PASSWORD
-        sync: false   # set in Render dashboard: Supabase project password
+        sync: false
       - key: DB_SSL
         value: "true"
-      # Redis is optional — the server boots and runs without it.
+      # Redis is optional — server boots without it
       - key: REDIS_HOST
         sync: false
       - key: REDIS_PORT
@@ -36,7 +37,7 @@ services:
       - key: REDIS_PASSWORD
         sync: false
       - key: JWT_SECRET
-        sync: false   # set in Render dashboard: any long random string
+        sync: false
       - key: CORS_ORIGINS
         value: "https://mogbank.vercel.app"
       - key: X402_ENABLED
