@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
+import { TopNav } from '@/components/ui'
 
 // ─── Particle Field ──────────────────────────────────────────────
 function ParticleField() {
@@ -191,17 +192,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#050510] text-[#d0d0e0] font-sans selection:bg-[#e8ff47]/30 selection:text-[#e8ff47]">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
-        
-        :root {
-          --neon: #e8ff47;
-          --cyan: #47ffe8;
-          --red: #ff6b47;
-          --bg: #050510;
-          --surface: #0a0a18;
-          --border: #1a1a2e;
-        }
-
         .fade-up {
           animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           opacity: 0;
@@ -313,50 +303,7 @@ export default function Home() {
       <ParticleField />
 
       {/* ─── NAV ──────────────────────────────────────────────── */}
-      <header className="relative z-10 border-b border-[#1a1a2e]/50 backdrop-blur-xl bg-[#050510]/80">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-lg bg-[#e8ff47] flex items-center justify-center shadow-[0_0_20px_rgba(232,255,71,0.3)] group-hover:shadow-[0_0_30px_rgba(232,255,71,0.5)] transition-shadow">
-              <span className="text-[#050510] font-bold text-xl" style={{ fontFamily: "'JetBrains Mono', monospace" }}>M</span>
-            </div>
-            <div>
-              <span className="text-lg tracking-tight font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>MogBank</span>
-              <span className="ml-2 px-2 py-0.5 text-[9px] bg-[#e8ff47]/10 text-[#e8ff47] rounded-full border border-[#e8ff47]/20 hidden sm:inline-block">
-                ABOS v1.0
-              </span>
-            </div>
-          </Link>
-
-          <nav className="hidden md:flex gap-8 text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-            {[
-              { href: '#architecture', label: 'Architecture' },
-              { href: '#discovery', label: 'Discovery' },
-              { href: '#agents', label: 'For Agents' },
-              { href: '/developers', label: 'API Docs', external: true },
-              { href: '/admin', label: 'Admin', external: true },
-            ].map(item => (
-              item.external ? (
-                <Link key={item.href} href={item.href} className="text-[#666] hover:text-[#47ffe8] transition-colors">
-                  {item.label}
-                </Link>
-              ) : (
-                <a key={item.href} href={item.href} className="text-[#666] hover:text-[#e8ff47] transition-colors">
-                  {item.label}
-                </a>
-              )
-            ))}
-          </nav>
-
-          <div className="flex gap-3">
-            <Link href="/faucet" className="hidden sm:flex px-4 py-2 text-xs border border-[#1a1a2e] rounded-lg text-[#47ffe8] hover:border-[#47ffe8]/50 hover:bg-[#47ffe8]/5 transition-all" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-              Testnet Faucet
-            </Link>
-            <Link href="/admin" className="px-4 py-2 text-xs bg-[#e8ff47]/10 border border-[#e8ff47]/30 rounded-lg text-[#e8ff47] hover:bg-[#e8ff47]/20 transition-all" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-              Human Access ↗
-            </Link>
-          </div>
-        </div>
-      </header>
+      <TopNav />
 
       {/* ─── HERO ─────────────────────────────────────────────── */}
       <section className="relative z-10 pt-28 pb-20 px-6">
@@ -364,7 +311,7 @@ export default function Home() {
           {/* Badge */}
           <div className={`inline-flex items-center gap-2 px-4 py-2 bg-[#e8ff47]/5 border border-[#e8ff47]/20 rounded-full mb-8 ${mounted ? 'fade-up' : 'opacity-0'}`}>
             <span className="w-2 h-2 rounded-full bg-[#e8ff47] animate-pulse" />
-            <span className="text-xs tracking-[4px] text-[#e8ff47]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>AGENT BANKING OPEN STANDARD</span>
+            <span className="text-xs tracking-[4px] text-[#e8ff47]" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>AGENT BANKING OPEN STANDARD</span>
           </div>
 
           {/* Main headline */}
@@ -374,7 +321,7 @@ export default function Home() {
           </h1>
 
           {/* Typewriter subtitle */}
-          <p className={`text-lg sm:text-xl text-[#666] max-w-2xl mx-auto mb-4 ${mounted ? 'fade-up fade-up-delay-2' : 'opacity-0'}`} style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          <p className={`text-lg sm:text-xl text-[#666] max-w-2xl mx-auto mb-4 ${mounted ? 'fade-up fade-up-delay-2' : 'opacity-0'}`} style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>
             <Typewriter texts={[
               'Built for ChatGPT. Built for Claude. Built for Gemini.',
               'AI agents register. AI agents transact. AI agents earn.',
@@ -390,13 +337,13 @@ export default function Home() {
 
           {/* CTA Buttons */}
           <div className={`flex flex-col sm:flex-row gap-4 justify-center mb-16 ${mounted ? 'fade-up fade-up-delay-3' : 'opacity-0'}`}>
-            <Link href="/developers" className="px-8 py-4 bg-[#e8ff47] text-[#050510] font-bold rounded-lg hover:shadow-[0_0_30px_rgba(232,255,71,0.4)] transition-all text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+            <Link href="/developers" className="px-8 py-4 bg-[#e8ff47] text-[#050510] font-bold rounded-lg hover:shadow-[0_0_30px_rgba(232,255,71,0.4)] transition-all text-sm" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>
               Integrate Your Agent →
             </Link>
-            <Link href="/faucet" className="px-8 py-4 border border-[#1a1a2e] rounded-lg text-[#47ffe8] hover:border-[#47ffe8]/50 hover:bg-[#47ffe8]/5 transition-all text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+            <Link href="/faucet" className="px-8 py-4 border border-[#1a1a2e] rounded-lg text-[#47ffe8] hover:border-[#47ffe8]/50 hover:bg-[#47ffe8]/5 transition-all text-sm" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>
               Get 10,000 Testnet Tokens
             </Link>
-            <a href="#discovery" className="px-8 py-4 border border-[#1a1a2e] rounded-lg text-[#666] hover:text-[#e8ff47] hover:border-[#e8ff47]/30 transition-all text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+            <a href="#discovery" className="px-8 py-4 border border-[#1a1a2e] rounded-lg text-[#666] hover:text-[#e8ff47] hover:border-[#e8ff47]/30 transition-all text-sm" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>
               Discovery Endpoint ↓
             </a>
           </div>
@@ -405,7 +352,7 @@ export default function Home() {
           <div className={`relative w-72 h-72 sm:w-96 sm:h-96 mx-auto ${mounted ? 'fade-up fade-up-delay-4' : 'opacity-0'}`}>
             {/* Center */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-[#e8ff47] flex items-center justify-center shadow-[0_0_40px_rgba(232,255,71,0.4)] z-10">
-              <span className="text-[#050510] font-bold text-2xl sm:text-3xl" style={{ fontFamily: "'JetBrains Mono', monospace" }}>M</span>
+              <span className="text-[#050510] font-bold text-2xl sm:text-3xl" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>M</span>
             </div>
 
             {/* Orbit rings */}
@@ -429,7 +376,7 @@ export default function Home() {
                   border: `1px solid ${node.color}30`,
                   color: node.color,
                   animation: `${node.anim} ${node.dur} linear infinite`,
-                  fontFamily: "'JetBrains Mono', monospace",
+                  fontFamily: 'var(--font-geist-mono), monospace',
                 }}
               >
                 {node.label.slice(0, 2)}
@@ -452,10 +399,10 @@ export default function Home() {
             { target: 30, suffix: 'bps', label: 'Fee Per Transaction', prefix: '', color: '#a78bfa', isCurrency: false },
           ].map(stat => (
             <div key={stat.label}>
-              <div className="text-3xl sm:text-4xl font-extrabold mb-1" style={{ color: stat.color, fontFamily: "'JetBrains Mono', monospace" }}>
+              <div className="text-3xl sm:text-4xl font-extrabold mb-1" style={{ color: stat.color, fontFamily: 'var(--font-geist-mono), monospace' }}>
                 {stat.isCurrency && '$'}<AnimatedCounter target={stat.target} suffix={stat.suffix} duration={2500} />
               </div>
-              <div className="text-xs text-[#555]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{stat.label}</div>
+              <div className="text-xs text-[#555]" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>{stat.label}</div>
             </div>
           ))}
         </div>
@@ -465,7 +412,7 @@ export default function Home() {
       <section id="architecture" className="relative z-10 py-24 px-6 hex-grid">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <div className="text-xs tracking-[4px] text-[#e8ff47] mb-4" style={{ fontFamily: "'JetBrains Mono', monospace" }}>ARCHITECTURE</div>
+            <div className="text-xs tracking-[4px] text-[#e8ff47] mb-4" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>ARCHITECTURE</div>
             <h2 className="text-4xl sm:text-5xl font-bold mb-4">
               Six Layers. <span className="gradient-text-cyan">One Standard.</span>
             </h2>
@@ -486,13 +433,13 @@ export default function Home() {
               >
                 {/* Number */}
                 <div className="flex items-center gap-3 mb-4">
-                  <span className="text-3xl font-extrabold opacity-20 group-hover:opacity-40 transition-opacity" style={{ color: layer.color, fontFamily: "'JetBrains Mono', monospace" }}>
+                  <span className="text-3xl font-extrabold opacity-20 group-hover:opacity-40 transition-opacity" style={{ color: layer.color, fontFamily: 'var(--font-geist-mono), monospace' }}>
                     {layer.num}
                   </span>
                   <span className="text-2xl">{layer.icon}</span>
                 </div>
 
-                <h3 className="text-lg font-bold mb-2 group-hover:text-[#e8ff47] transition-colors" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                <h3 className="text-lg font-bold mb-2 group-hover:text-[#e8ff47] transition-colors" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>
                   {layer.name}
                 </h3>
                 <p className="text-sm text-[#555] leading-relaxed">{layer.desc}</p>
@@ -517,7 +464,7 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             {/* Left: Code block */}
             <div>
-              <div className="text-xs tracking-[4px] text-[#47ffe8] mb-4" style={{ fontFamily: "'JetBrains Mono', monospace" }}>HOW AGENTS JOIN</div>
+              <div className="text-xs tracking-[4px] text-[#47ffe8] mb-4" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>HOW AGENTS JOIN</div>
               <h2 className="text-3xl sm:text-4xl font-bold mb-6">
                 One POST Request.<br /><span className="gradient-text">Bank Account Created.</span>
               </h2>
@@ -528,7 +475,7 @@ export default function Home() {
 
               <div className="flex flex-wrap gap-3">
                 {['ChatGPT', 'Claude', 'Gemini', 'DeepSeek', 'Llama', 'Grok', 'Mistral', 'Qwen'].map(model => (
-                  <span key={model} className="px-3 py-1.5 text-[11px] bg-[#0a0a18] border border-[#1a1a2e] rounded-full text-[#888] hover:text-[#e8ff47] hover:border-[#e8ff47]/30 transition-colors" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                  <span key={model} className="px-3 py-1.5 text-[11px] bg-[#0a0a18] border border-[#1a1a2e] rounded-full text-[#888] hover:text-[#e8ff47] hover:border-[#e8ff47]/30 transition-colors" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>
                     {model}
                   </span>
                 ))}
@@ -541,10 +488,10 @@ export default function Home() {
                 <span className="w-3 h-3 rounded-full bg-[#ff5f56]" />
                 <span className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
                 <span className="w-3 h-3 rounded-full bg-[#27c93f]" />
-                <span className="ml-2 text-xs text-[#555]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Agent Registration — KYA-7</span>
+                <span className="ml-2 text-xs text-[#555]" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>Agent Registration — KYA-7</span>
               </div>
               <div className="p-5 overflow-x-auto">
-                <pre className="text-xs sm:text-sm leading-relaxed" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                <pre className="text-xs sm:text-sm leading-relaxed" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>
                   <code>
                     <span className="text-[#555]"># Any AI agent registers itself</span>{'\n'}
                     <span className="text-[#47ffe8]">POST</span> <span className="text-[#e8ff47]">/api/v1/agents/register</span>{'\n\n'}
@@ -576,7 +523,7 @@ export default function Home() {
       {/* ─── ESCROW FLOW ───────────────────────────────────────── */}
       <section className="relative z-10 py-24 px-6">
         <div className="max-w-5xl mx-auto text-center">
-          <div className="text-xs tracking-[4px] text-[#e8ff47] mb-4" style={{ fontFamily: "'JetBrains Mono', monospace" }}>TRUST LAYER</div>
+          <div className="text-xs tracking-[4px] text-[#e8ff47] mb-4" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>TRUST LAYER</div>
           <h2 className="text-3xl sm:text-4xl font-bold mb-6">
             Every Transaction Uses <span className="gradient-text-cyan">Escrow</span>
           </h2>
@@ -603,14 +550,14 @@ export default function Home() {
                   style={{ borderColor: `${item.color}20` }}
                 >
                   <div className="text-3xl mb-2">{item.icon}</div>
-                  <div className="font-bold text-sm mb-1" style={{ color: item.color, fontFamily: "'JetBrains Mono', monospace" }}>{item.state}</div>
+                  <div className="font-bold text-sm mb-1" style={{ color: item.color, fontFamily: 'var(--font-geist-mono), monospace' }}>{item.state}</div>
                   <div className="text-xs text-[#555] whitespace-pre-line">{item.desc}</div>
                 </div>
               )
             ))}
           </div>
 
-          <p className="mt-10 text-xs text-[#444]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          <p className="mt-10 text-xs text-[#444]" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>
             Three-state atomic machine. No partial states are possible. Funds are always in exactly one state.
           </p>
         </div>
@@ -620,7 +567,7 @@ export default function Home() {
       <section id="discovery" className="relative z-10 py-24 px-6 bg-[#0a0a18]/50 backdrop-blur">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
-            <div className="text-xs tracking-[4px] text-[#47ffe8] mb-4" style={{ fontFamily: "'JetBrains Mono', monospace" }}>DISCOVERY</div>
+            <div className="text-xs tracking-[4px] text-[#47ffe8] mb-4" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>DISCOVERY</div>
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
               Any Agent. <span className="gradient-text">Automatic Discovery.</span>
             </h2>
@@ -636,8 +583,8 @@ export default function Home() {
               { method: 'GET', path: '/.well-known/agent.json', desc: 'A2A Agent Card — capabilities, authentication, webhooks.' },
             ].map(endpoint => (
               <div key={endpoint.path} className="p-5 bg-[#050510] border border-[#1a1a2e] rounded-xl hover:border-[#e8ff47]/20 transition-colors">
-                <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-[#47ffe8]/10 text-[#47ffe8] mb-3" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{endpoint.method}</span>
-                <code className="block text-sm sm:text-base font-bold mb-2 text-[#e8ff47] break-all" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{endpoint.path}</code>
+                <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-[#47ffe8]/10 text-[#47ffe8] mb-3" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>{endpoint.method}</span>
+                <code className="block text-sm sm:text-base font-bold mb-2 text-[#e8ff47] break-all" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>{endpoint.path}</code>
                 <p className="text-xs text-[#555]">{endpoint.desc}</p>
               </div>
             ))}
@@ -647,10 +594,10 @@ export default function Home() {
           <div className="bg-[#050510] border border-[#1a1a2e] rounded-xl overflow-hidden">
             <div className="flex items-center gap-2 px-4 py-3 border-b border-[#1a1a2e] bg-[#0a0a18]">
               <span className="w-2 h-2 rounded-full bg-[#27c93f]" />
-              <span className="text-xs text-[#555]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>GET /.well-known/abos.json → 200 OK</span>
+              <span className="text-xs text-[#555]" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>GET /.well-known/abos.json → 200 OK</span>
             </div>
             <div className="p-5 overflow-x-auto">
-              <pre className="text-xs sm:text-sm leading-relaxed" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              <pre className="text-xs sm:text-sm leading-relaxed" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>
                 <code>
                   <span className="text-[#555]">{'{'}</span>{'\n'}
                   <span className="text-[#47ffe8]">  "abos_version"</span>: <span className="text-[#e8ff47]">"1.0"</span>,{'\n'}
@@ -677,7 +624,7 @@ export default function Home() {
       {/* ─── WHAT HUMANS SEE ───────────────────────────────────── */}
       <section className="relative z-10 py-24 px-6">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="text-xs tracking-[4px] text-[#ff6b47] mb-4" style={{ fontFamily: "'JetBrains Mono', monospace" }}>THE INVARIANT</div>
+          <div className="text-xs tracking-[4px] text-[#ff6b47] mb-4" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>THE INVARIANT</div>
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">
             Humans Cannot Transact. <span className="gradient-text">Ever.</span>
           </h2>
@@ -695,13 +642,13 @@ export default function Home() {
             ].map(item => (
               <div key={item.label} className="p-5 bg-[#0a0a18] border border-[#1a1a2e] rounded-xl hover:border-[#ff6b47]/20 transition-colors">
                 <div className="text-3xl mb-3">{item.icon}</div>
-                <div className="font-bold text-sm mb-1" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{item.label}</div>
+                <div className="font-bold text-sm mb-1" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>{item.label}</div>
                 <div className="text-xs text-[#555]">{item.desc}</div>
               </div>
             ))}
           </div>
 
-          <Link href="/admin" className="inline-flex items-center gap-2 px-8 py-3 border border-[#ff6b47]/30 rounded-lg text-[#ff6b47] hover:bg-[#ff6b47]/10 transition-all" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.875rem' }}>
+          <Link href="/admin" className="inline-flex items-center gap-2 px-8 py-3 border border-[#ff6b47]/30 rounded-lg text-[#ff6b47] hover:bg-[#ff6b47]/10 transition-all" style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.875rem' }}>
             Enter Human Observation Panel ↗
           </Link>
         </div>
@@ -720,13 +667,13 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/developers" className="px-10 py-4 bg-[#e8ff47] text-[#050510] font-bold rounded-lg hover:shadow-[0_0_40px_rgba(232,255,71,0.5)] transition-all text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+            <Link href="/developers" className="px-10 py-4 bg-[#e8ff47] text-[#050510] font-bold rounded-lg hover:shadow-[0_0_40px_rgba(232,255,71,0.5)] transition-all text-sm" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>
               Integrate Your Agent →
             </Link>
-            <Link href="/faucet" className="px-10 py-4 border border-[#1a1a2e] rounded-lg text-[#47ffe8] hover:border-[#47ffe8]/50 transition-all text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+            <Link href="/faucet" className="px-10 py-4 border border-[#1a1a2e] rounded-lg text-[#47ffe8] hover:border-[#47ffe8]/50 transition-all text-sm" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>
               Testnet Faucet (10,000 UNIT)
             </Link>
-            <Link href="/admin" className="px-10 py-4 border border-[#1a1a2e] rounded-lg text-[#ff6b47] hover:border-[#ff6b47]/30 transition-all text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+            <Link href="/admin" className="px-10 py-4 border border-[#1a1a2e] rounded-lg text-[#ff6b47] hover:border-[#ff6b47]/30 transition-all text-sm" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>
               Human: View Stats
             </Link>
           </div>
@@ -738,13 +685,13 @@ export default function Home() {
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded bg-[#e8ff47]/20 flex items-center justify-center border border-[#e8ff47]/30">
-              <span className="text-[#e8ff47] font-bold text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>M</span>
+              <span className="text-[#e8ff47] font-bold text-sm" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>M</span>
             </div>
-            <span className="text-sm text-[#555]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+            <span className="text-sm text-[#555]" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>
               MogBank — ABOS v1.0 · Bank for AI Agents
             </span>
           </div>
-          <div className="flex gap-6 text-xs text-[#444]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          <div className="flex gap-6 text-xs text-[#444]" style={{ fontFamily: 'var(--font-geist-mono), monospace' }}>
             <span>CC BY 4.0</span>
             <span>Mog Technologies FZE</span>
             <span>ADGM, Abu Dhabi</span>

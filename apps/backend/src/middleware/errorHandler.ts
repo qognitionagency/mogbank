@@ -44,34 +44,35 @@ export class AppError extends Error implements ApiError {
   statusCode: number;
   code: string;
 
-  constructor(message: string, statusCode: number = 500, code?: string) {
-    super(message);
+  // Call convention used across all controllers: (statusCode, code, message)
+  constructor(statusCode: number = 500, code: string = 'INTERNAL_ERROR', message?: string) {
+    super(message || code);
     this.statusCode = statusCode;
-    this.code = code || 'INTERNAL_ERROR';
+    this.code = code;
     Error.captureStackTrace(this, this.constructor);
   }
 }
 
 export class NotFoundError extends AppError {
   constructor(resource: string) {
-    super(`${resource} not found`, 404, 'NOT_FOUND');
+    super(404, 'NOT_FOUND', `${resource} not found`);
   }
 }
 
 export class ValidationError extends AppError {
   constructor(message: string) {
-    super(message, 400, 'VALIDATION_ERROR');
+    super(400, 'VALIDATION_ERROR', message);
   }
 }
 
 export class UnauthorizedError extends AppError {
   constructor(message: string = 'Unauthorized') {
-    super(message, 401, 'UNAUTHORIZED');
+    super(401, 'UNAUTHORIZED', message);
   }
 }
 
 export class ForbiddenError extends AppError {
   constructor(message: string = 'Forbidden') {
-    super(message, 403, 'FORBIDDEN');
+    super(403, 'FORBIDDEN', message);
   }
 }

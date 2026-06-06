@@ -4,14 +4,6 @@
   "framework": "nextjs",
   "installCommand": "pnpm install --frozen-lockfile",
   "regions": ["bom1"],
-  "env": {
-    "NEXT_PUBLIC_SUPABASE_URL": "@supabase-url",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase-anon-key",
-    "SUPABASE_SERVICE_ROLE_KEY": "@supabase-service-role-key",
-    "NEXT_PUBLIC_BASE_RPC_URL": "@base-rpc-url",
-    "NEXT_PUBLIC_USDC_CONTRACT_ADDRESS": "@usdc-contract-address",
-    "DDSC_CONTRACT_ADDRESS": "@ddsc-contract-address"
-  },
   "headers": [
     {
       "source": "/(.*)",

@@ -13,6 +13,8 @@ export const config = {
     name: process.env.DB_NAME || 'mogbank',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'postgres',
+    // Supabase (and most managed Postgres) require TLS. Set DB_SSL=true in prod.
+    ssl: process.env.DB_SSL === 'true',
   },
 
   redis: {

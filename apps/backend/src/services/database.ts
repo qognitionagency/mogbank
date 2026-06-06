@@ -4,7 +4,7 @@
  * PostgreSQL connection pool and query helpers.
  * Provides transactional support for double-entry ledger operations.
  */
-import { Pool, PoolClient, QueryResult } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 
@@ -22,7 +22,7 @@ export function initDatabase(externalPool: Pool): void {
   logger.info('Database service initialized');
 }
 
-export async function query<T = any>(
+export async function query<T extends QueryResultRow = any>(
   text: string,
   params?: any[]
 ): Promise<QueryResult<T>> {

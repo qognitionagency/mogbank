@@ -1,16 +1,48 @@
 {
   "abos_version": "1.0",
+  "conformance_level": "ABOS-Full",
   "provider": "MogBank",
-  "currencies": ["USDC"],
+  "operator": "Mog Technologies FZE",
+  "description": "The world's first open bank for autonomous AI agents. Machine-native KYA identity, programmable multi-currency custody, atomic agent-to-agent transfers, escrow marketplace, and cryptographic delegated mandates.",
+  "network": "testnet",
+  "min_kya_score": 60,
+  "protocols": ["x402", "a2a", "ap2"],
+  "currencies": ["USDC", "USD", "AED"],
   "x402_enabled": true,
   "a2a_card_url": "https://mogbank.vercel.app/.well-known/agent.json",
-  "ap2_mandate_endpoint": "https://mogbank.vercel.app/api/v1/mandates",
+  "api": {
+    "web": "https://mogbank.vercel.app/api/v1",
+    "public_agent_api": "https://mogbank-api.onrender.com/api/v1",
+    "websocket": "wss://mogbank-api.onrender.com/ws",
+    "sse_balance": "https://mogbank-api.onrender.com/api/v1/stream/balance/{walletId}"
+  },
   "layers": {
     "kya": "https://mogbank.vercel.app/api/v1/agents",
     "custody": "https://mogbank.vercel.app/api/v1/wallets",
     "transfer": "https://mogbank.vercel.app/api/v1/transfer",
     "marketplace": "https://mogbank.vercel.app/api/v1/marketplace",
-    "mandates": "https://mogbank.vercel.app/api/v1/mandates"
+    "discovery": "https://mogbank.vercel.app/.well-known/abos.json",
+    "mandates": "https://mogbank.vercel.app/api/v1/transfer"
   },
-  "testnet_faucet": "https://mogbank.vercel.app/api/v1/faucet"
+  "endpoints": {
+    "register": "https://mogbank.vercel.app/api/v1/agents/register",
+    "agent": "https://mogbank.vercel.app/api/v1/agents/{id}",
+    "wallets": "https://mogbank.vercel.app/api/v1/wallets",
+    "transfer": "https://mogbank.vercel.app/api/v1/transfer",
+    "faucet": "https://mogbank.vercel.app/api/v1/faucet",
+    "marketplace_services": "https://mogbank.vercel.app/api/v1/marketplace/services",
+    "marketplace_escrow": "https://mogbank.vercel.app/api/v1/marketplace/escrow"
+  },
+  "ap2": {
+    "supported": true,
+    "submitted_inline_with": "https://mogbank.vercel.app/api/v1/transfer",
+    "signature_algorithm": "Ed25519"
+  },
+  "sdks": {
+    "typescript": "https://github.com/mog-bank/abos",
+    "python": "https://github.com/mog-bank/abos",
+    "frameworks": ["langchain", "crewai", "autogen", "semantic-kernel"]
+  },
+  "documentation": "https://github.com/mog-bank/abos",
+  "spec": "https://github.com/mog-bank/abos"
 }

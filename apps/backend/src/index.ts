@@ -31,9 +31,12 @@ const pool = new Pool({
   database: config.database.name,
   user: config.database.user,
   password: config.database.password,
-  max: 20,
+  // Supabase requires TLS; the pooler presents a cert that doesn't match the
+  // requested host, so disable strict verification (transport still encrypted).
+  ssl: config.database.ssl ? { rejectUnauthorized: false } : undefined,
+  max: 10,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  connectionTimeoutMillis: 10000,
 });
 
 // Initialize database service with pool

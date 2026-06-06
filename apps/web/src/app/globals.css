@@ -18,6 +18,7 @@
   --color-mog-red: var(--mog-red);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-display);
 }
 
 html {
@@ -55,4 +56,106 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #2a2a3e;
+}
+
+/* ============================================================
+   MogBank design system — premium agent-bank aesthetic
+   ============================================================ */
+.font-display { font-family: var(--font-display), 'Syne', sans-serif; letter-spacing: -0.02em; }
+.font-mono-ds { font-family: var(--font-geist-mono), 'JetBrains Mono', monospace; }
+
+/* Atmospheric page background: deep void + dual radial glows + fine grid */
+.mog-bg {
+  position: relative;
+  background:
+    radial-gradient(900px 500px at 12% -8%, rgba(232, 255, 71, 0.06), transparent 60%),
+    radial-gradient(800px 500px at 100% 0%, rgba(71, 255, 232, 0.05), transparent 55%),
+    var(--background);
+}
+.mog-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(120, 130, 180, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 130, 180, 0.045) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(circle at 50% 0%, black, transparent 75%);
+  z-index: 0;
+}
+
+/* Surfaces */
+.mog-card {
+  position: relative;
+  background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005));
+  border: 1px solid var(--mog-border);
+  border-radius: 16px;
+  transition: transform .25s cubic-bezier(.2,.8,.2,1), border-color .25s, box-shadow .25s;
+}
+.mog-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(232, 255, 71, 0.35);
+  box-shadow: 0 18px 50px -28px rgba(232, 255, 71, 0.35);
+}
+.mog-card-quiet { background: var(--mog-surface); border: 1px solid var(--mog-border); border-radius: 16px; }
+
+/* Stat tiles */
+.mog-stat-value { font-family: var(--font-display); font-weight: 700; letter-spacing: -.02em; }
+
+/* Badges */
+.mog-badge {
+  display: inline-flex; align-items: center; gap: .4em;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .08em;
+  padding: .25em .6em; border-radius: 999px; border: 1px solid transparent;
+}
+.mog-badge-green { color: var(--mog-cyan); background: rgba(71,255,232,.08); border-color: rgba(71,255,232,.3); }
+.mog-badge-yellow { color: var(--mog-yellow); background: rgba(232,255,71,.08); border-color: rgba(232,255,71,.3); }
+.mog-badge-red { color: var(--mog-red); background: rgba(255,107,71,.08); border-color: rgba(255,107,71,.3); }
+.mog-badge-muted { color: #8a8aa0; background: rgba(138,138,160,.08); border-color: rgba(138,138,160,.25); }
+
+/* Buttons */
+.mog-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5em;
+  font-family: var(--font-geist-mono), monospace; font-weight: 600;
+  padding: .7em 1.2em; border-radius: 12px; cursor: pointer;
+  transition: transform .15s, box-shadow .25s, background .2s; border: 1px solid transparent;
+}
+.mog-btn:active { transform: translateY(1px) scale(.99); }
+.mog-btn-primary { background: var(--mog-yellow); color: #0a0a12; box-shadow: 0 10px 30px -12px rgba(232,255,71,.6); }
+.mog-btn-primary:hover { box-shadow: 0 14px 38px -10px rgba(232,255,71,.8); }
+.mog-btn-ghost { background: transparent; color: var(--foreground); border-color: var(--mog-border); }
+.mog-btn-ghost:hover { border-color: rgba(71,255,232,.5); color: var(--mog-cyan); }
+
+/* Inputs */
+.mog-input {
+  width: 100%; background: #07070f; border: 1px solid var(--mog-border);
+  border-radius: 12px; padding: .8em 1em; color: var(--foreground);
+  font-family: var(--font-geist-mono), monospace; transition: border-color .2s, box-shadow .2s;
+}
+.mog-input:focus { outline: none; border-color: rgba(232,255,71,.5); box-shadow: 0 0 0 3px rgba(232,255,71,.12); }
+
+/* Nav */
+.mog-nav-link { position: relative; transition: color .2s; }
+.mog-nav-link::after {
+  content: ""; position: absolute; left: 0; bottom: -6px; height: 2px; width: 0;
+  background: var(--mog-yellow); transition: width .25s ease;
+}
+.mog-nav-link:hover::after, .mog-nav-link[data-active="true"]::after { width: 100%; }
+
+/* Animations */
+@keyframes mogFadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+.mog-reveal { opacity: 0; animation: mogFadeUp .6s cubic-bezier(.2,.8,.2,1) forwards; }
+@keyframes mogGlow { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+.mog-glow { animation: mogGlow 2.4s ease-in-out infinite; }
+@keyframes mogSweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.mog-sweep { transform-origin: center; animation: mogSweep 6s linear infinite; }
+@keyframes mogDash { to { stroke-dashoffset: -24; } }
+.mog-flow { stroke-dasharray: 6 6; animation: mogDash 1s linear infinite; }
+@keyframes mogPop { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+.mog-pop { animation: mogPop .5s cubic-bezier(.2,.9,.3,1.4) forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mog-reveal, .mog-glow, .mog-sweep, .mog-flow, .mog-pop { animation: none; opacity: 1; }
 }

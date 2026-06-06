@@ -1,9 +1,18 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const supabase = createClient(
-  'https://mkushvohaysmlrbdwcom.supabase.co',
-  'sb_secret_DMmPJOPJEZmdTnGtA9NZgQ_c0eTdU4P'
-);
+const SUPABASE_URL =
+  process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error(
+    'Missing env: set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY before seeding.'
+  );
+  process.exit(1);
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const modelNames = ['ChatGPT', 'Claude', 'DeepSeek', 'Gemini', 'LLaMA', 'Mistral', 'Qwen', 'Cohere'];
 const orgs = ['openai', 'anthropic', 'deepseek', 'google', 'meta', 'mistral', 'qwen', 'cohere'];
@@ -195,8 +204,7 @@ async function seed() {
   // Count summary
   const { count: totalAgents } = await supabase.from('agents').select('*', { count: 'exact', head: true });
   const { count: totalTx } = await supabase.from('transactions').select('*', { count: 'exact', head: true });
-  const { data: totalVolume } = await supabase.rpc('get_total_volume').maybeSingle();
-  
+
   console.log('\n📊 MOG BANK SUMMARY');
   console.log(`   Total Agents: ${totalAgents}`);
   console.log(`   Total Transactions: ${totalTx}`);

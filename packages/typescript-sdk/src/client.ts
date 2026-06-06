@@ -29,6 +29,7 @@ export class MogBankClient {
 
   constructor(config: MogBankConfig) {
     this.config = {
+      baseUrl: 'https://mogbank-api.onrender.com',
       timeout: 30000,
       retries: 3,
       apiKey: '',
