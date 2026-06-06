@@ -15,16 +15,17 @@ services:
         value: production
       - key: PORT
         value: "3001"
+      # Supabase connection pooler (transaction mode) — Singapore region
       - key: DB_HOST
-        sync: false
+        value: "aws-0-ap-southeast-1.pooler.supabase.com"
       - key: DB_PORT
-        value: "5432"
+        value: "6543"
       - key: DB_NAME
-        sync: false
+        value: "postgres"
       - key: DB_USER
-        sync: false
+        value: "postgres.mkushvohaysmlrbdwcom"
       - key: DB_PASSWORD
-        sync: false
+        sync: false   # set in Render dashboard: Supabase project password
       - key: DB_SSL
         value: "true"
       # Redis is optional — the server boots and runs without it.
@@ -34,12 +35,14 @@ services:
         value: "6379"
       - key: REDIS_PASSWORD
         sync: false
+      - key: JWT_SECRET
+        sync: false   # set in Render dashboard: any long random string
       - key: CORS_ORIGINS
         value: "https://mogbank.vercel.app"
       - key: X402_ENABLED
         value: "true"
       - key: ETH_RPC_URL
-        sync: false
+        value: "https://mainnet.base.org"
       - key: ETH_CHAIN_ID
         value: "8453"
       - key: DDSC_ENABLED
