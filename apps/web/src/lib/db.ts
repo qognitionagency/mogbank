@@ -809,8 +809,12 @@ class QueryBuilder<T = any[]> implements PromiseLike<Result<T>> {
         if (this.payload.length === 0) {
           throw new Error('insert() requires at least one row')
         }
-        // PostgREST requires a uniform column set; use the union of all rows
-        // so a row omitting an optional field still binds NULL for it.
+        // A bulk insert needs one uniform column list, so take the union of
+        // the rows' keys. A row that omits a key must fall through to the
+        // column DEFAULT, not NULL — callers legitimately supply an explicit
+        // `id` on one row and let the sequence fill it on the next, and NULL
+        // would violate the primary key. An explicit `undefined` still means
+        // NULL, matching how the value would serialise over the wire.
         const columns = [
           ...new Set(this.payload.flatMap((row) => Object.keys(row))),
         ]
@@ -821,7 +825,9 @@ class QueryBuilder<T = any[]> implements PromiseLike<Result<T>> {
         }
         const tuples = this.payload.map((row) => {
           const bound = columns.map((column) =>
-            params.bind(row[column], meta.columns.get(column))
+            column in row
+              ? params.bind(row[column], meta.columns.get(column))
+              : 'DEFAULT'
           )
           return `(${bound.join(', ')})`
         })

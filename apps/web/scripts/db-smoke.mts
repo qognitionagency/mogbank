@@ -75,20 +75,34 @@ const { error: multiErr } = await db.from('transactions').insert([
 ])
 check('multi-row insert', !multiErr, multiErr)
 
+// 7b. Ragged multi-row insert: one row sets `id`, the other leaves it to the
+// column default. Absent keys must fall through to DEFAULT, not NULL — the
+// a2a payment route relies on exactly this shape.
+const pinnedId = '11111111-2222-3333-4444-555555555555'
+const { error: raggedErr } = await db.from('transactions').insert([
+  { id: pinnedId, wallet_id: w1.id, counterparty_wallet_id: w2.id, type: 'payment', amount: 250, fee: 1, status: 'confirmed', ledger_entry: 'debit', protocol: 'a2a' },
+  { wallet_id: w2.id, counterparty_wallet_id: w1.id, type: 'payment', amount: 250, fee: 0, status: 'confirmed', ledger_entry: 'credit', protocol: 'a2a' },
+])
+check('ragged multi-row insert', !raggedErr, raggedErr)
+const { data: a2aRows } = await db.from('transactions').select('id, ledger_entry').eq('protocol', 'a2a')
+check('both a2a rows landed', a2aRows?.length === 2, a2aRows)
+check('explicit id honoured', a2aRows?.some((r: any) => r.id === pinnedId), a2aRows)
+check('defaulted id generated', a2aRows?.every((r: any) => !!r.id), a2aRows)
+
 // 8. .or() + .limit() + .order()
 const { data: txs, error: orErr } = await db.from('transactions')
   .select('*').or(`wallet_id.eq.${w1.id},counterparty_wallet_id.eq.${w1.id}`)
   .order('created_at', { ascending: false }).limit(10)
-check('.or() filter', !orErr && txs?.length === 2, orErr ?? txs?.length)
+check('.or() filter', !orErr && txs?.length === 4, orErr ?? txs?.length)
 
 // 9. .not(col,'is',null)
 const { data: ledger, error: notErr } = await db.from('transactions').select('*').eq('wallet_id', w1.id).not('ledger_entry', 'is', null).order('created_at', { ascending: false }).limit(50)
-check('.not(is,null)', !notErr && ledger?.length === 1, notErr ?? ledger?.length)
+check('.not(is,null)', !notErr && ledger?.length === 2, notErr ?? ledger?.length)
 
 // 10. .gte() on timestamps
 const midnight = new Date(); midnight.setHours(0,0,0,0)
 const { data: today, error: gteErr } = await db.from('transactions').select('amount').eq('wallet_id', w1.id).gte('created_at', midnight.toISOString())
-check('.gte() timestamp', !gteErr && today?.length === 1, gteErr ?? today)
+check('.gte() timestamp', !gteErr && today?.length === 2, gteErr ?? today)
 
 // 11. rpc()
 const { data: rpcOut, error: rpcErr } = await db.rpc('process_transfer', {
