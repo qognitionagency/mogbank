@@ -6,14 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:smoke": "node scripts/db-smoke.mts"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "@noble/curves": "^2.2.0",
     "@noble/ed25519": "^3.1.0",
     "@noble/hashes": "^2.2.0",
-    "@supabase/ssr": "^0.10.2",
-    "@supabase/supabase-js": "^2.105.1",
     "ethers": "^6.16.0",
     "jose": "^6.2.3",
     "next": "16.2.4",

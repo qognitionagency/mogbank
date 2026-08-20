@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase'
+import { createServerClient } from '@/lib/db'
 import { hashIdempotencyKey } from '@/lib/crypto'
 import { v4 as uuidv4 } from 'uuid'
 

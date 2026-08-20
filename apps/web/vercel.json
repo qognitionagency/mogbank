@@ -1,8 +1,6 @@
 {
-  "buildCommand": "pnpm run build",
-  "outputDirectory": ".next",
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "installCommand": "pnpm install --frozen-lockfile",
   "regions": ["bom1"],
   "headers": [
     {
@@ -30,7 +28,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co; img-src 'self' data: blob:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         }
       ]
     },
@@ -61,14 +59,9 @@
     }
   ],
   "rewrites": [
-    {
-      "source": "/api/v1/:path*",
-      "destination": "/api/v1/:path*"
-    },
-    {
-      "source": "/health",
-      "destination": "/api/v1/health"
-    }
+    { "source": "/health", "destination": "/api/health" },
+    { "source": "/.well-known/abos.json", "destination": "/.well-known/abos" },
+    { "source": "/.well-known/agent.json", "destination": "/.well-known/agent" }
   ],
   "functions": {
     "src/app/api/**/*.ts": {
@@ -78,10 +71,6 @@
     "src/app/api/v1/transfer/*.ts": {
       "memory": 1024,
       "maxDuration": 60
-    },
-    "src/app/api/v1/blockchain/**/*.ts": {
-      "memory": 1024,
-      "maxDuration": 120
     }
   }
 }

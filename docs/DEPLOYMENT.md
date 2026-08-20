@@ -2,7 +2,12 @@
 
 This document records the production topology and the exact steps to (re)deploy
 MogBank: the Next.js web app on **Vercel**, the Express API on **Render**, and
-the **Supabase** Postgres database shared by both.
+the **Neon** Postgres database shared by both.
+
+> The web app moved off Supabase onto Neon. Neon is plain PostgreSQL with no
+> PostgREST gateway, so `supabase-js` cannot reach it; `apps/web/src/lib/db.ts`
+> reimplements the slice of the PostgREST query builder the routes use and
+> compiles each chain to parameterised SQL. Route code was left as it was.
 
 ## Architecture
 
@@ -10,11 +15,11 @@ the **Supabase** Postgres database shared by both.
                          ┌────────────────────────────┐
    AI agents / browsers ─┤  mogbank.vercel.app (Next)  │  self-sufficient:
                          │  /api/v1/* + /.well-known/*  │  its own API hits
-                         └──────────────┬──────────────┘  Supabase directly
-                                        │ supabase-js (service role)
+                         └──────────────┬──────────────┘  Neon directly
+                                        │ @neondatabase/serverless (HTTP)
                          ┌──────────────▼──────────────┐
-                         │   Supabase Postgres (17.x)   │  single shared DB
-                         │   project: mureitfujzcabl…   │  schema: supabase/schema.sql
+                         │     Neon Postgres (18.x)     │  single shared DB
+                         │  ep-odd-cherry-axa8rct2      │  schema: db/schema.neon.sql
                          └──────────────▲──────────────┘
                                         │ node-postgres (Session Pooler, SSL)
                          ┌──────────────┴──────────────┐
@@ -23,7 +28,9 @@ the **Supabase** Postgres database shared by both.
                          └──────────────────────────────┘
 ```
 
-Both backends are reconciled against **one** schema (`supabase/schema.sql`). The
+Both backends are reconciled against **one** schema. `db/schema.neon.sql` is the
+live one (generated from `supabase/schema.sql`, minus the RLS policies and
+`service_role` grants, which are Supabase-only constructs). The
 web app records its ledger on the `transactions` table (via the `ledger_entry`
 discriminator); the Express API uses dedicated `ledger_entries` +
 `idempotency_keys` + `marketplace_services` + `escrow` tables. The schema is a
@@ -34,56 +41,71 @@ superset of both.
 | Component | Status | URL |
 |---|---|---|
 | Web (Vercel) | ✅ Live | https://mogbank.vercel.app |
-| Database (Supabase) | ✅ Schema loaded + seeded (55 agents, 250 tx) | project `mureitfujzcablshzizv` |
-| API (Render) | ⏳ Blocked on Render billing (see below) | https://mogbank-api.onrender.com |
+| Database (Neon) | ✅ Schema loaded, empty | `ep-odd-cherry-axa8rct2` (us-east-2) |
+| API (Render) | ⏳ Still points at Supabase — see §3 | https://mogbank-api.onrender.com |
 
-## 1. Database (Supabase)
+## 1. Database (Neon)
 
 The schema is **destructive/re-runnable** (drops then recreates all tables).
-There is no `psql`/`supabase` CLI requirement — load it with Node + `pg`:
 
 ```bash
-# from repo root; pg is available under apps/backend/node_modules
-NODE_PATH="apps/backend/node_modules" \
-  DB_HOST="db.mureitfujzcablshzizv.supabase.co" \
-  DB_PASSWORD='<DB_PASSWORD>' \
-  node scripts/db-load.js
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/schema.neon.sql
+```
 
-# optional demo data
-NODE_PATH="apps/web/node_modules" \
-  SUPABASE_URL="https://mureitfujzcablshzizv.supabase.co" \
-  SUPABASE_SERVICE_ROLE_KEY="<SERVICE_ROLE_KEY>" \
-  node scripts/seed.js
+Verify the data layer against the live database — this exercises every query
+shape the API routes use (embeds, `text[]`, `jsonb`, bigint arithmetic,
+`.single()` semantics, RPC) and cleans up after itself:
+
+```bash
+cd apps/web && DATABASE_URL="$DATABASE_URL" npm run db:smoke
 ```
 
 Notes:
-- The **direct** host `db.<ref>.supabase.co` is IPv6-only. It works from most
-  laptops but **not from Render** (no outbound IPv6). Render must use the
-  **Session Pooler** (IPv4): `aws-1-ap-south-1.pooler.supabase.com`, user
-  `postgres.mureitfujzcablshzizv`, port `5432`, `sslmode=require`.
+- Use the **pooler** host (`…-pooler.…neon.tech`) everywhere. Serverless
+  functions open a connection per invocation; the pooler is what makes that
+  affordable.
+- `db/schema.neon.sql` is generated from `supabase/schema.sql`. If you change
+  one, regenerate the other — `supabase/schema.sql` is kept only as the record
+  of the original Supabase-era schema and is no longer deployed.
 
 ## 2. Web (Vercel)
 
-Project: `qognitionagencys-projects/web` (root directory = `apps/web`).
+Project: `qognitionagencys-projects/mogbank` — this is the project that owns
+`mogbank.vercel.app`. It must be configured with:
 
-Environment variables (Production):
+| Setting | Value |
+|---|---|
+| Root Directory | `apps/web` |
+| Framework Preset | Next.js |
+| Build / Install / Output | unset (framework defaults) |
+
+Getting either of the first two wrong is what produced the site-wide 404s: with
+no root directory and preset "Other", Vercel served the repo root as static
+files and never built the app.
+
+Environment variables (Production, Preview, Development):
 
 | Key | Value |
 |---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://mureitfujzcablshzizv.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the `sb_publishable_…` key |
-| `SUPABASE_SERVICE_ROLE_KEY` | the `sb_secret_…` key (sensitive) |
+| `DATABASE_URL` | the Neon **pooler** connection string (encrypted) |
+| `NEXT_PUBLIC_ABOS_VERSION` | `1.0` |
+| `NEXT_PUBLIC_PROVIDER` | `MogBank` |
+| `NEXT_PUBLIC_X402_ENABLED` | `true` |
+| `NEXT_PUBLIC_TESTNET_FAUCET_AMOUNT` | `10000` |
 
 Deploy (from `apps/web`, CLI already authed):
 
 ```bash
 cd apps/web
 vercel --prod --yes
-vercel alias set <deployment-url> mogbank.vercel.app
 ```
 
+The project is also connected to `qognitionagency/mogbank` on GitHub with
+production branch `main`, so pushing to `main` deploys as well.
+
 `apps/web/vercel.json` no longer uses legacy `@secret` references — env vars live
-in project settings.
+in project settings. Its CSP `connect-src` is `'self'` only: the browser never
+talks to the database, the API routes do.
 
 ## 3. API (Render)
 
@@ -133,10 +155,13 @@ x402/a2a/ap2 support, and the SDK/skill catalog.
 
 ## 5. ⚠️ Rotate the leaked secrets
 
-The database password and service-role/secret keys were shared in plaintext
-during setup. After confirming the deploy, **rotate them** in Supabase:
-- Settings → Database → Reset database password (then update Vercel + Render env)
-- Settings → API → roll the `service_role`/secret key (then update Vercel + Render)
+The Neon connection string (including `npg_TY6msStHW4Uc`) and the old Supabase
+service-role key were shared in plaintext during setup. After confirming the
+deploy, **rotate them**:
+- Neon → Roles → reset the `neondb_owner` password, then update `DATABASE_URL`
+  in Vercel (and Render, once §3 is migrated).
+- Supabase → the old project's service-role key, if that project still exists.
+  It has been removed from the Vercel project's environment either way.
 
 ## 6. Branch / PR
 

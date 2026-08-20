@@ -16,16 +16,26 @@ vercel --prod
 
 Or connect your GitHub repository to Vercel at: https://vercel.com
 
-### 2. Set Up Supabase Database
-
-Run the schema in Supabase SQL Editor:
+### 2. Set Up the Neon Database
 
 ```bash
-# Copy contents of supabase/schema.sql and run in:
-# https://mkushvohaysmlrbdwcom.supabase.co/sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/schema.neon.sql
+
+# verify the data layer end to end (creates and cleans up its own rows)
+cd apps/web && DATABASE_URL="$DATABASE_URL" npm run db:smoke
 ```
 
 ### 3. Configure Environment Variables
+
+`apps/web` needs one secret — the Neon **pooler** connection string:
+
+| Key | Notes |
+|---|---|
+| `DATABASE_URL` | server-side only; never exposed to the browser |
+| `NEXT_PUBLIC_ABOS_VERSION` | `1.0` |
+| `NEXT_PUBLIC_PROVIDER` | `MogBank` |
+| `NEXT_PUBLIC_X402_ENABLED` | `true` |
+| `NEXT_PUBLIC_TESTNET_FAUCET_AMOUNT` | `10000` |
 
 ---
 
@@ -83,7 +93,10 @@ POST /api/v1/faucet
 
 ## 🔐 Security (2026 Standards)
 
-- Row Level Security (RLS) on all tables
+- No public database surface — Neon is reached only from server-side route
+  handlers, never from the browser (this replaces the RLS posture that Supabase's
+  PostgREST gateway required)
+- Every query parameterised; identifiers validated against the live schema
 - API Key + JWT authentication
 - Rate limiting per agent
 - Immutable audit logs
@@ -96,7 +109,7 @@ POST /api/v1/faucet
 
 ```
 mogbank/
-├── apps/web/                 # Next.js 14 App Router
+├── apps/web/                 # Next.js 16 App Router
 │   ├── src/
 │   │   ├── app/              # Pages
 │   │   │   ├── page.tsx      # Landing
@@ -106,11 +119,14 @@ mogbank/
 │   │   │   ├── faucet/       # Testnet faucet
 │   │   │   ├── developers/   # API docs
 │   │   │   └── api/          # API routes (6 layers)
-│   │   ├── lib/              # Supabase client
+│   │   ├── lib/              # db.ts (Neon data layer) + crypto.ts
 │   │   └── types/            # TypeScript types
-│   └── vercel.json
+│   ├── vercel.json
+│   └── scripts/              # db:smoke integration test
+├── db/
+│   └── schema.neon.sql       # Database schema (deployed)
 ├── supabase/
-│   └── schema.sql            # Database schema
+│   └── schema.sql            # Superseded — Supabase-era original
 └── README.md
 ```
 
@@ -124,7 +140,7 @@ mogbank/
 - **Faucet**: https://mogbank.vercel.app/faucet
 - **Marketplace**: https://mogbank.vercel.app/marketplace
 - **API Docs**: https://mogbank.vercel.app/developers
-- **Supabase**: https://mkushvohaysmlrbdwcom.supabase.co
+- **Database**: Neon `ep-odd-cherry-axa8rct2` (us-east-2)
 
 ---
 
