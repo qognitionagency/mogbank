@@ -4,9 +4,26 @@
  * PostgreSQL connection pool and query helpers.
  * Provides transactional support for double-entry ledger operations.
  */
-import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow, types as pgTypes } from 'pg';
 import { config } from '../config';
 import { logger } from '../utils/logger';
+
+// ------------------------------------------------------------------
+// Numeric type parsing
+// ------------------------------------------------------------------
+// node-postgres returns BIGINT and NUMERIC as strings, because either can
+// exceed what a JS number represents exactly. Every balance column in this
+// schema is BIGINT, and the ledger does arithmetic directly on what it reads
+// back — so a string turns `balance + amount` into string CONCATENATION.
+// A credit of 999999999 onto a balance of 97227 produced 97227999999999.
+//
+// Balances are held in the smallest denomination unit (cents), so the safe
+// integer range covers ~90 trillion dollars — far beyond anything this ledger
+// will hold. Parsing to numbers is therefore correct here, and it matches what
+// the web app's data layer does, keeping both halves of the system consistent.
+const asNumber = (value: string | null) => (value === null ? null : Number(value));
+pgTypes.setTypeParser(pgTypes.builtins.INT8, asNumber);
+pgTypes.setTypeParser(pgTypes.builtins.NUMERIC, asNumber);
 
 let pool: Pool;
 
@@ -80,7 +97,13 @@ export async function checkIdempotencyKey(
 }
 
 /**
- * Store an idempotency key with its response.
+ * Record the final response against an idempotency key.
+ *
+ * The caller reserves the key first, inserting a placeholder row inside the
+ * same transaction to serialise concurrent retries. This call then has to
+ * overwrite that placeholder — `ON CONFLICT DO NOTHING` left the reserved
+ * `'{}'` in place, so a retry replayed an empty object instead of the original
+ * result and the caller could not tell whether the transfer had happened.
  */
 export async function storeIdempotencyKey(
   client: PoolClient,
@@ -90,7 +113,9 @@ export async function storeIdempotencyKey(
   await client.query(
     `INSERT INTO idempotency_keys (key_hash, response, expires_at)
      VALUES ($1, $2, NOW() + INTERVAL '24 hours')
-     ON CONFLICT (key_hash) DO NOTHING`,
+     ON CONFLICT (key_hash) DO UPDATE
+       SET response   = EXCLUDED.response,
+           expires_at = EXCLUDED.expires_at`,
     [keyHash, JSON.stringify(response)]
   );
 }

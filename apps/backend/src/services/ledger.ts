@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { withTransaction, checkIdempotencyKey, storeIdempotencyKey } from './database';
 import { hashIdempotencyKey } from './crypto';
 import { logger } from '../utils/logger';
+import { AppError } from '../middleware/errorHandler';
 import { PoolClient } from 'pg';
 
 export interface LedgerEntry {
@@ -93,16 +94,18 @@ export async function executeDoubleEntryTransfer(
     );
 
     if (!sender) {
-      throw new Error(`Sender wallet ${fromWalletId} not found`);
+      throw new AppError(404, 'WALLET_NOT_FOUND', `Sender wallet ${fromWalletId} not found`);
     }
     if (sender.status !== 'active') {
-      throw new Error(`Sender wallet ${fromWalletId} is ${sender.status}`);
+      throw new AppError(409, 'WALLET_NOT_ACTIVE', `Sender wallet ${fromWalletId} is ${sender.status}`);
     }
 
     // Check balance (including fee)
     const totalDeduction = amount + fee;
     if (sender.balance < totalDeduction) {
-      throw new Error(
+      throw new AppError(
+        400,
+        'INSUFFICIENT_BALANCE',
         `Insufficient balance: ${sender.balance} < ${totalDeduction}`
       );
     }
@@ -114,10 +117,10 @@ export async function executeDoubleEntryTransfer(
     );
 
     if (!recipient) {
-      throw new Error(`Recipient wallet ${toWalletId} not found`);
+      throw new AppError(404, 'WALLET_NOT_FOUND', `Recipient wallet ${toWalletId} not found`);
     }
     if (recipient.status !== 'active') {
-      throw new Error(`Recipient wallet ${toWalletId} is ${recipient.status}`);
+      throw new AppError(409, 'WALLET_NOT_ACTIVE', `Recipient wallet ${toWalletId} is ${recipient.status}`);
     }
 
     // --- Calculate new balances ---

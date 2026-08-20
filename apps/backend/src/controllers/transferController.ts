@@ -31,8 +31,15 @@ export async function transferUsdc(req: Request, res: Response): Promise<void> {
     throw new AppError(400, 'MISSING_REQUIRED_FIELDS', 'from_wallet_id, to_wallet_id, and amount are required');
   }
 
-  if (typeof amount !== 'number' || amount <= 0) {
-    throw new AppError(400, 'INVALID_AMOUNT', 'Amount must be a positive number');
+  // Money is stored as BIGINT in the smallest denomination unit (ABOS Layer 2),
+  // so a fractional amount has no representation and must be rejected here
+  // rather than failing at the INSERT.
+  if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0) {
+    throw new AppError(
+      400,
+      'INVALID_AMOUNT',
+      'Amount must be a positive integer in the smallest denomination unit (cents)'
+    );
   }
 
   if (from_wallet_id === to_wallet_id) {
@@ -60,10 +67,14 @@ export async function transferUsdc(req: Request, res: Response): Promise<void> {
     }
   }
 
-  // Calculate protocol fee (0.25% for x402, 0.1% default)
+  // Calculate protocol fee (0.25% for x402, 0.1% default).
+  // The fee lands in BIGINT columns alongside the amount, so it is rounded to
+  // a whole cent. Keeping six decimal places here produced values like
+  // 99979.88, which Postgres rejects for bigint and which rolled back every
+  // transfer whose fee was not exactly whole.
   const x402Payment = (req as any).x402Payment;
   const feeRate = x402Payment ? 0.0025 : 0.001;
-  const fee = Math.round(amount * feeRate * 1_000_000) / 1_000_000; // 6 decimal precision
+  const fee = Math.round(amount * feeRate);
 
   // Execute double-entry transfer
   const result = await executeDoubleEntryTransfer({

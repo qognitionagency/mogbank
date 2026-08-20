@@ -76,3 +76,20 @@ export class ForbiddenError extends AppError {
     super(403, 'FORBIDDEN', message);
   }
 }
+
+/**
+ * Wrap an async route handler so a rejected promise reaches `errorHandler`.
+ *
+ * Express 4 does not await handlers, so a controller that throws — including
+ * every `AppError` thrown for validation — produces an unhandled rejection
+ * that terminates the process instead of returning a response. Under Node 20+
+ * that is a hard crash: one bad request takes the API down. Every async
+ * handler must go through this wrapper.
+ */
+export const asyncHandler =
+  <T extends (req: Request, res: Response, next: NextFunction) => Promise<unknown>>(
+    handler: T
+  ) =>
+  (req: Request, res: Response, next: NextFunction): void => {
+    Promise.resolve(handler(req, res, next)).catch(next);
+  };

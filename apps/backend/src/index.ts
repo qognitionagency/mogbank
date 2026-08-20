@@ -25,15 +25,26 @@ const server = http.createServer(app);
 // ============================================================
 // Database Pool Initialization
 // ============================================================
+// Production runs against Neon, which hands out a single connection string and
+// serves a certificate from a public CA — so the chain is verified rather than
+// waved through. Local docker-compose development has no URL and no TLS, and
+// falls back to the discrete DB_* fields.
+const poolConfig = config.database.url
+  ? {
+      connectionString: config.database.url,
+      ssl: { rejectUnauthorized: true },
+    }
+  : {
+      host: config.database.host,
+      port: config.database.port,
+      database: config.database.name,
+      user: config.database.user,
+      password: config.database.password,
+      ssl: config.database.ssl ? { rejectUnauthorized: true } : undefined,
+    };
+
 const pool = new Pool({
-  host: config.database.host,
-  port: config.database.port,
-  database: config.database.name,
-  user: config.database.user,
-  password: config.database.password,
-  // Supabase requires TLS; the pooler presents a cert that doesn't match the
-  // requested host, so disable strict verification (transport still encrypted).
-  ssl: config.database.ssl ? { rejectUnauthorized: false } : undefined,
+  ...poolConfig,
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
@@ -47,20 +58,39 @@ initDatabase(pool);
 // ============================================================
 let redisClient: ReturnType<typeof createClient> | null = null;
 
+// Redis backs rate limiting, caching and stream pub/sub, all of which degrade
+// gracefully — the deployment blueprint documents it as optional. Two things
+// are needed to actually make it optional:
+//   1. do not dial at all unless a host is configured, and
+//   2. bound the reconnect attempts. node-redis retries forever by default, so
+//      `await connect()` never settles against an absent server and startup
+//      hangs before `server.listen()` — the service comes up, fails its health
+//      check, and gets recycled.
 async function initRedis() {
+  if (!config.redis.host) {
+    logger.info('Redis not configured — running without cache/pub-sub');
+    return;
+  }
   try {
     redisClient = createClient({
       socket: {
         host: config.redis.host,
         port: config.redis.port,
+        connectTimeout: 5000,
+        reconnectStrategy: (retries) =>
+          retries >= 3 ? new Error('Redis unreachable') : Math.min(200 * (retries + 1), 1000),
       },
       password: config.redis.password || undefined,
     });
     redisClient.on('error', (err) => logger.warn('Redis connection error', { error: err.message }));
     await redisClient.connect();
-    logger.info('Redis connected');
+    logger.info('Redis connected', { host: config.redis.host, port: config.redis.port });
   } catch (err: any) {
     logger.warn('Redis not available — running without cache/pub-sub', { error: err.message });
+    redisClient?.removeAllListeners();
+    // disconnect() drops the socket without waiting to drain, which is what we
+    // want for a client that never finished connecting.
+    await redisClient?.disconnect().catch(() => {});
     redisClient = null;
   }
 }
@@ -200,8 +230,26 @@ app.get('/abos', (_req, res) => {
   });
 });
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Render polls this as the service health check. An API that cannot reach its
+// ledger is not healthy, so the database is actually queried rather than
+// assumed up — a 503 here is the correct signal to stop routing traffic.
+app.get('/health', async (_req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({
+      status: 'ok',
+      database: 'connected',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    logger.error('Health check failed to reach the database', { error: err.message });
+    res.status(503).json({
+      status: 'degraded',
+      database: 'unavailable',
+      error: err.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 app.get('/.well-known/abos', (_req, res) => {
@@ -234,7 +282,13 @@ async function start() {
   try {
     // Test database connection
     const client = await pool.connect();
-    logger.info('Database connected', { host: config.database.host, database: config.database.name });
+    const { rows } = await client.query(
+      'SELECT current_database() AS database, inet_server_addr()::text AS server'
+    );
+    logger.info('Database connected', {
+      database: rows[0]?.database,
+      via: config.database.url ? 'DATABASE_URL' : `${config.database.host}:${config.database.port}`,
+    });
     client.release();
 
     // Initialize Redis

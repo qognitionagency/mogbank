@@ -16,19 +16,10 @@ services:
         value: production
       - key: PORT
         value: "10000"
-      # Supabase connection pooler (transaction mode)
-      - key: DB_HOST
-        value: "aws-0-ap-southeast-1.pooler.supabase.com"
-      - key: DB_PORT
-        value: "6543"
-      - key: DB_NAME
-        value: "postgres"
-      - key: DB_USER
-        value: "postgres.mkushvohaysmlrbdwcom"
-      - key: DB_PASSWORD
+      # Neon connection pooler — same database as apps/web.
+      # Set in the Render dashboard; never commit the connection string.
+      - key: DATABASE_URL
         sync: false
-      - key: DB_SSL
-        value: "true"
       # Redis is optional — server boots without it
       - key: REDIS_HOST
         sync: false

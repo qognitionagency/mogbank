@@ -4,10 +4,15 @@ This document records the production topology and the exact steps to (re)deploy
 MogBank: the Next.js web app on **Vercel**, the Express API on **Render**, and
 the **Neon** Postgres database shared by both.
 
-> The web app moved off Supabase onto Neon. Neon is plain PostgreSQL with no
-> PostgREST gateway, so `supabase-js` cannot reach it; `apps/web/src/lib/db.ts`
-> reimplements the slice of the PostgREST query builder the routes use and
-> compiles each chain to parameterised SQL. Route code was left as it was.
+> Both backends moved off Supabase onto Neon.
+>
+> `apps/backend` already spoke plain PostgreSQL via `node-postgres`, so it only
+> needed repointing at a `DATABASE_URL`.
+>
+> `apps/web` was the harder half: Neon has no PostgREST gateway, so
+> `supabase-js` cannot reach it. `apps/web/src/lib/db.ts` reimplements the
+> slice of the PostgREST query builder the routes use and compiles each chain
+> to parameterised SQL, leaving the route code as it was.
 
 ## Architecture
 
@@ -21,7 +26,7 @@ the **Neon** Postgres database shared by both.
                          │     Neon Postgres (18.x)     │  single shared DB
                          │  ep-odd-cherry-axa8rct2      │  schema: db/schema.neon.sql
                          └──────────────▲──────────────┘
-                                        │ node-postgres (Session Pooler, SSL)
+                                        │ node-postgres (pooler, TLS verified)
                          ┌──────────────┴──────────────┐
    AI agents / SDKs ─────┤  mogbank-api.onrender.com    │  dedicated public API
                          │  Express + WS/SSE + x402     │  (REST mirror + streams)
@@ -42,7 +47,7 @@ superset of both.
 |---|---|---|
 | Web (Vercel) | ✅ Live | https://mogbank.vercel.app |
 | Database (Neon) | ✅ Schema loaded, empty | `ep-odd-cherry-axa8rct2` (us-east-2) |
-| API (Render) | ⏳ Still points at Supabase — see §3 | https://mogbank-api.onrender.com |
+| API (Render) | ⏳ Code is on Neon; service not yet created (billing) | https://mogbank-api.onrender.com |
 
 ## 1. Database (Neon)
 
@@ -109,9 +114,18 @@ talks to the database, the API routes do.
 
 ## 3. API (Render)
 
-`render.yaml` is a blueprint, but the service can also be created via the API.
+The Express API talks to the **same Neon database** as the web app, over
+`node-postgres`. It reads a single `DATABASE_URL`; the discrete `DB_HOST` /
+`DB_USER` / … variables remain only as a docker-compose local-dev fallback and
+are unset in production. TLS certificates are verified (`rejectUnauthorized:
+true`) — Neon serves a public-CA certificate, so the previous
+verification-disabled workaround for Supabase's pooler is gone.
+
+`render.yaml` is the blueprint. Set `DATABASE_URL` in the Render dashboard —
+it is marked `sync: false` so the connection string is never committed.
+
 **Render requires a payment card on the account before any service can be
-created** (`https://dashboard.render.com/billing`). Once added, create it:
+created** (`https://dashboard.render.com/billing`). Once added:
 
 ```bash
 KEY=$(awk '/^  *key:/{print $2; exit}' ~/.render/cli.yaml)
@@ -120,30 +134,54 @@ curl -s -X POST https://api.render.com/v1/services \
     "type":"web_service","name":"mogbank-api",
     "ownerId":"tea-d85qd5btqb8s73fe62pg",
     "repo":"https://github.com/qognitionagency/mogbank",
-    "branch":"deploy/mogbank-reconcile","autoDeploy":"yes","rootDir":"",
+    "branch":"main","autoDeploy":"yes","rootDir":"apps/backend",
     "envVars":[
       {"key":"NODE_ENV","value":"production"},
-      {"key":"PORT","value":"3001"},
-      {"key":"DB_HOST","value":"aws-1-ap-south-1.pooler.supabase.com"},
-      {"key":"DB_PORT","value":"5432"},
-      {"key":"DB_NAME","value":"postgres"},
-      {"key":"DB_USER","value":"postgres.mureitfujzcablshzizv"},
-      {"key":"DB_PASSWORD","value":"<DB_PASSWORD>"},
-      {"key":"DB_SSL","value":"true"},
+      {"key":"PORT","value":"10000"},
+      {"key":"DATABASE_URL","value":"<NEON_POOLER_URL>"},
+      {"key":"JWT_SECRET","value":"<JWT_SECRET>"},
       {"key":"CORS_ORIGINS","value":"https://mogbank.vercel.app"},
       {"key":"X402_ENABLED","value":"true"},
       {"key":"ETH_CHAIN_ID","value":"8453"},
       {"key":"DDSC_ENABLED","value":"false"}
     ],
-    "serviceDetails":{"region":"singapore","plan":"starter","runtime":"docker",
+    "serviceDetails":{"region":"singapore","plan":"free","runtime":"node",
       "healthCheckPath":"/health",
-      "envSpecificDetails":{"dockerfilePath":"./apps/backend/Dockerfile","dockerContext":"."}}
+      "envSpecificDetails":{"buildCommand":"npm install && npm run build",
+        "startCommand":"node dist/index.js"}}
   }'
 ```
 
-Redis is **optional** — the server boots and runs without it.
+Redis is **optional** — the server boots and runs without it. It genuinely is
+now: `initRedis` only dials when `REDIS_HOST` is set and gives up after three
+attempts. node-redis reconnects forever by default, so `await connect()` never
+settled against an absent server and startup hung before `server.listen()` —
+the service came up, failed its health check, and got recycled.
 
-Verify: `curl https://mogbank-api.onrender.com/health` → `{"status":"ok",...}`.
+### Money-path defects fixed alongside the migration
+
+The Express API had never been deployed, so its transfer path had never run.
+Four defects were found and fixed while verifying it against Neon:
+
+| Defect | Effect |
+|---|---|
+| `pg` returns `BIGINT` as a string, and the ledger did `balance + amount` | **String concatenation.** A credit of 999999999 onto a balance of 97227 produced a balance of 97227999999999. Fixed centrally with `setTypeParser` for `INT8`/`NUMERIC` in `services/database.ts`, matching the web app. |
+| Protocol fee kept 6 decimal places against `BIGINT` columns | Every transfer whose fee was not a whole cent rolled back with `invalid input syntax for type bigint: "99979.88"`. Fee is now `Math.round(amount * feeRate)`, and fractional amounts are rejected with 400. |
+| Async controllers threw into Express 4, which does not await them | Unhandled rejection → **process exit**. One bad request took the whole API down; `errorHandler` was unreachable. All 21 handlers now go through `asyncHandler`. |
+| `storeIdempotencyKey` used `ON CONFLICT DO NOTHING` over its own reservation row | The real response never replaced the `'{}'` placeholder, so a retried transfer replayed an empty object and 500'd — a client could not tell whether its payment had gone through. Now an upsert. |
+
+Business-rule violations in the ledger (unknown wallet, frozen wallet,
+insufficient balance) raise `AppError` with 404/409/400 instead of a bare
+`Error` that surfaced as a 500.
+
+
+`/health` now queries the database rather than reporting `ok` unconditionally,
+so Render's health check fails (503) if the ledger is unreachable. Verify:
+
+```bash
+curl https://mogbank-api.onrender.com/health
+# {"status":"ok","database":"connected",...}
+```
 
 ## 4. Discovery (agent-facing)
 

@@ -140,7 +140,7 @@ mogbank/
 - **Faucet**: https://mogbank.vercel.app/faucet
 - **Marketplace**: https://mogbank.vercel.app/marketplace
 - **API Docs**: https://mogbank.vercel.app/developers
-- **Database**: Neon `ep-odd-cherry-axa8rct2` (us-east-2)
+- **Database**: Neon `ep-odd-cherry-axa8rct2` (us-east-2) — shared by the web app and the Express API
 
 ---
 

@@ -8,17 +8,28 @@ export const config = {
   corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3001'],
 
   database: {
+    // Preferred: a single connection string, which is how Neon (and every
+    // other managed Postgres) hands out credentials. The discrete fields below
+    // remain for local docker-compose development, where there is no URL.
+    url:
+      process.env.DATABASE_URL ||
+      process.env.POSTGRES_URL ||
+      process.env.NEON_DATABASE_URL ||
+      undefined,
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432', 10),
     name: process.env.DB_NAME || 'mogbank',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'postgres',
-    // Supabase (and most managed Postgres) require TLS. Set DB_SSL=true in prod.
+    // Managed Postgres requires TLS. Set DB_SSL=true when using the discrete
+    // fields; a DATABASE_URL always connects with TLS.
     ssl: process.env.DB_SSL === 'true',
   },
 
   redis: {
-    host: process.env.REDIS_HOST || 'localhost',
+    // No default: an unset REDIS_HOST means "no Redis", not "try localhost".
+    // Local development sets it explicitly in .env.
+    host: process.env.REDIS_HOST || undefined,
     port: parseInt(process.env.REDIS_PORT || '6379', 10),
     password: process.env.REDIS_PASSWORD,
   },
