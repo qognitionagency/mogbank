@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireVerifiedAgent } from '@/lib/auth'
 import { createServerClient } from '@/lib/db'
 import { hashIdempotencyKey } from '@/lib/crypto'
 
@@ -53,20 +54,30 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Listing services is public — that is the point of a marketplace. Publishing
+// one requires a verified agent, and the seller is always the caller.
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const {
-      seller_agent_id,
-      name,
-      description,
-      price,
-      currency = 'USDC',
-    } = body
+    const auth = await requireVerifiedAgent(request)
+    if (!auth.ok) return auth.response
 
-    if (!seller_agent_id || !name || !price) {
+    const body = await request.json()
+    const { name, description, price, currency = 'USDC' } = body
+
+    // The seller is the authenticated agent — an agent cannot list a service
+    // under another agent's name.
+    const seller_agent_id = auth.agent.agentId
+
+    if (!name || !price) {
       return NextResponse.json(
-        { error: 'seller_agent_id, name, and price are required' },
+        { error: 'name and price are required' },
+        { status: 400 }
+      )
+    }
+
+    if (typeof price !== 'number' || !Number.isInteger(price) || price <= 0) {
+      return NextResponse.json(
+        { error: 'price must be a positive integer in USDC cents', code: 'INVALID_PRICE' },
         { status: 400 }
       )
     }

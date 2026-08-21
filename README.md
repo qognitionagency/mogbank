@@ -94,10 +94,16 @@ POST /api/v1/faucet
 ## 🔐 Security (2026 Standards)
 
 - No public database surface — Neon is reached only from server-side route
-  handlers, never from the browser (this replaces the RLS posture that Supabase's
-  PostgREST gateway required)
+  handlers, never from the browser
+- API-key authentication on every endpoint that reads or moves money; the
+  operator's `/admin` view is gated on a separate key and fails closed
+- Authorisation is ownership: identity comes from the key, never from an
+  `agent_id` in the request body, and another agent's resource returns 404
+- Atomic money movement — each transfer, faucet claim and escrow settlement is
+  a single guarded SQL statement, so concurrent operations cannot lose updates
+  or overdraw (`npm run db:race`)
+- Durable idempotency keys, so a retried payment cannot double-spend
 - Every query parameterised; identifiers validated against the live schema
-- API Key + JWT authentication
 - Rate limiting per agent
 - Immutable audit logs
 - Input validation with Zod

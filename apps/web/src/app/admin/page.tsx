@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { TopNav, StatCard, Badge } from '@/components/ui'
 
 interface Agent {
@@ -46,16 +46,45 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
   const [loading, setLoading] = useState(true)
 
-  const fetchData = async () => {
+  // The admin endpoints expose every agent's data, so they are gated on the
+  // operator key. It is held in sessionStorage rather than a cookie so it is
+  // never sent automatically with a cross-site request, and is gone when the
+  // tab closes.
+  const [adminKey, setAdminKey] = useState('')
+  const [keyPrompt, setKeyPrompt] = useState('')
+  const [authError, setAuthError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem('mogbank_admin_key')
+    if (stored) setAdminKey(stored)
+    else setLoading(false)
+  }, [])
+
+  const fetchData = useCallback(async (key: string) => {
+    if (!key) return
     try {
+      const headers = { 'x-admin-key': key }
       const [agentsRes, walletsRes, txRes] = await Promise.all([
-        fetch('/api/v1/admin/agents'),
-        fetch('/api/v1/admin/wallets'),
-        fetch('/api/v1/admin/transactions'),
+        fetch('/api/v1/admin/agents', { headers }),
+        fetch('/api/v1/admin/wallets', { headers }),
+        fetch('/api/v1/admin/transactions', { headers }),
       ])
+
+      if (agentsRes.status === 401) {
+        sessionStorage.removeItem('mogbank_admin_key')
+        setAdminKey('')
+        setAuthError('That admin key was not accepted.')
+        return
+      }
+      if (agentsRes.status === 503) {
+        setAuthError('Admin access is not configured on this deployment (ADMIN_API_KEY is unset).')
+        return
+      }
+
       const agentData = await agentsRes.json()
       const walletData = await walletsRes.json()
       const txData = await txRes.json()
+      setAuthError(null)
       if (agentData.agents) setAgents(agentData.agents)
       if (walletData.wallets) setWallets(walletData.wallets)
       if (txData.transactions) setTransactions(txData.transactions)
@@ -64,13 +93,24 @@ export default function Admin() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    fetchData()
-    const interval = setInterval(fetchData, 30000)
+    if (!adminKey) return
+    fetchData(adminKey)
+    const interval = setInterval(() => fetchData(adminKey), 30000)
     return () => clearInterval(interval)
-  }, [])
+  }, [adminKey, fetchData])
+
+  const unlock = (event: React.FormEvent) => {
+    event.preventDefault()
+    const key = keyPrompt.trim()
+    if (!key) return
+    sessionStorage.setItem('mogbank_admin_key', key)
+    setKeyPrompt('')
+    setLoading(true)
+    setAdminKey(key)
+  }
 
   const getAgentWallet = (agentId: string) => wallets.find(w => w.agent_id === agentId)
   const getAgent = (agentId: string) => agents.find(a => a.id === agentId)
@@ -113,6 +153,46 @@ export default function Admin() {
     addr ? addr.substring(0, 10) + '…' + addr.substring(addr.length - 4) : ''
   const formatBalance = (amount: number) => '$' + (amount / 100).toFixed(2)
   const formatTime = (ts: string) => new Date(ts).toLocaleString()
+
+  // Locked until the operator supplies the admin key.
+  if (!adminKey) {
+    return (
+      <div className="mog-bg min-h-screen text-[#d0d0e0]">
+        <TopNav />
+        <div className="flex items-center justify-center py-32 px-6">
+          <form onSubmit={unlock} className="mog-card w-full max-w-md p-8">
+            <h1 className="font-display text-xl font-bold tracking-tight">
+              Operator access
+            </h1>
+            <p className="mt-2 font-mono-ds text-sm text-[#6c6c84]">
+              The admin view reads every agent, wallet and transaction in the
+              bank. Enter the operator key to continue.
+            </p>
+            <input
+              type="password"
+              value={keyPrompt}
+              onChange={(e) => setKeyPrompt(e.target.value)}
+              placeholder="Admin key"
+              autoComplete="off"
+              className="mt-6 w-full rounded-lg border border-[#1a1a2e] bg-[#0b0b14] px-4 py-3 font-mono-ds text-sm text-[#d0d0e0] outline-none focus:border-[#e8ff47]"
+            />
+            {authError && (
+              <p className="mt-3 font-mono-ds text-sm text-[#ff6b6b]">{authError}</p>
+            )}
+            <button
+              type="submit"
+              className="mt-4 w-full rounded-lg bg-[#e8ff47] px-4 py-3 font-display text-sm font-bold text-[#0b0b14] transition hover:opacity-90"
+            >
+              Unlock
+            </button>
+            <p className="mt-4 font-mono-ds text-xs text-[#4a4a5e]">
+              Held in this tab only, and cleared when it closes.
+            </p>
+          </form>
+        </div>
+      </div>
+    )
+  }
 
   if (loading) {
     return (

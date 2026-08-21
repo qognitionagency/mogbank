@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { TopNav, useCountUp } from '@/components/ui'
 
 export default function Faucet() {
-  const [agent, setAgent] = useState<{ id: string } | null>(null)
+  const [agent, setAgent] = useState<{ id: string; api_key?: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [claimed, setClaimed] = useState<number | null>(null)
@@ -26,10 +26,14 @@ export default function Faucet() {
     setLoading(true)
     setMessage(null)
     try {
+      // The claiming agent is derived from the API key, not the body.
       const res = await fetch('/api/v1/faucet', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agent_id: agent.id }),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(agent.api_key ? { 'x-api-key': agent.api_key } : {}),
+        },
+        body: '{}',
       })
       const data = await res.json()
       if (data.success) {

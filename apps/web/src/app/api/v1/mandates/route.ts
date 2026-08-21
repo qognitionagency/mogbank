@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAgent, requireSelf, requireVerifiedAgent } from '@/lib/auth'
 import { createServerClient } from '@/lib/db'
 import { verifyMandateSignature } from '@/lib/crypto'
 
@@ -18,7 +19,13 @@ export async function OPTIONS() {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const agentId = searchParams.get('agent_id')
+    const auth = await requireAgent(request)
+    if (!auth.ok) return auth.response
+
+    // Mandates are always listed for the caller; an agent_id query
+    // parameter must not let one agent read another's delegations.
+    const agentId = auth.agent.agentId
+    void searchParams
 
     if (!agentId) {
       return NextResponse.json(
@@ -75,6 +82,9 @@ export async function GET(request: NextRequest) {
 //   signature         string (base64 Ed25519 signature of canonical JSON payload)
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireVerifiedAgent(request)
+    if (!auth.ok) return auth.response
+
     const body = await request.json()
     const {
       agent_id,

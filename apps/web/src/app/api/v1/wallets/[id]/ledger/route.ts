@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAgent, requireSelf, requireWalletOwner } from '@/lib/auth'
 import { createServerClient } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
@@ -14,7 +15,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAgent(request)
+    if (!auth.ok) return auth.response
+
     const { id } = await params
+
+    // Re-derive ownership: a wallet id alone must not expose its history.
+    const owned = await requireWalletOwner(auth.agent, id)
+    if (!owned.ok) return owned.response
     const { searchParams } = new URL(request.url)
     const limit = Math.min(parseInt(searchParams.get('limit') || '100', 10), 500)
 

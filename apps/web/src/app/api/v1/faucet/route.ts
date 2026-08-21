@@ -1,199 +1,121 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/db'
-import { hashIdempotencyKey } from '@/lib/crypto'
-import { v4 as uuidv4 } from 'uuid'
+import { requireAgent } from '@/lib/auth'
+import { claimFaucet } from '@/lib/ledger'
+import { ledgerErrorResponse, randomTxHash } from '@/lib/api'
 
 export const dynamic = 'force-dynamic'
 
-const FAUCET_AMOUNT = 10000 // 10,000 UNIT (in cents = 100 USD)
+const FAUCET_AMOUNT = 10000 // 10,000 UNIT (cents = 100 USD)
 const CLAIM_COOLDOWN_HOURS = 24
 
-const idempotencyStore = new Map<
-  string,
-  { response: unknown; timestamp: number }
->()
-
-setInterval(() => {
-  const cutoff = Date.now() - 5 * 60 * 1000
-  for (const [k, v] of idempotencyStore) {
-    if (v.timestamp < cutoff) idempotencyStore.delete(k)
-  }
-}, 60_000).unref?.()
-
+/**
+ * POST /api/v1/faucet — claim testnet funds (ABOS testnet only).
+ *
+ * The claiming agent is taken from the API key, never from the request body:
+ * previously any caller could name any `agent_id` and drain the faucet on its
+ * behalf. The cooldown is enforced inside the same statement that credits the
+ * wallet, so simultaneous claims cannot both pass the check.
+ */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { agent_id } = body
-
-    if (!agent_id) {
-      return NextResponse.json(
-        { error: 'Agent ID is required' },
-        { status: 400 }
-      )
-    }
-
-    // Idempotency key enforcement
-    const idempotencyKey = request.headers.get('x-idempotency-key')
-    if (idempotencyKey) {
-      const hash = hashIdempotencyKey(idempotencyKey)
-      const entry = idempotencyStore.get(hash)
-      if (entry) {
-        return NextResponse.json(entry.response, {
-          status: 200,
-          headers: { 'x-idempotency-key': idempotencyKey },
-        })
-      }
-    }
+    const auth = await requireAgent(request)
+    if (!auth.ok) return auth.response
 
     const supabase = createServerClient()
 
-    // Check if agent exists
-    const { data: agent, error: agentError } = await supabase
-      .from('agents')
-      .select('id, kya_score')
-      .eq('id', agent_id)
-      .single()
-
-    if (agentError || !agent) {
-      return NextResponse.json(
-        { error: 'Agent not found' },
-        { status: 404 }
-      )
-    }
-
-    // Check last claim time
-    const { data: lastClaim } = await supabase
-      .from('faucet_claims')
-      .select('claimed_at')
-      .eq('agent_id', agent_id)
-      .order('claimed_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    if (lastClaim) {
-      const lastClaimTime = new Date(lastClaim.claimed_at)
-      const now = new Date()
-      const hoursSinceLastClaim =
-        (now.getTime() - lastClaimTime.getTime()) / (1000 * 60 * 60)
-
-      if (hoursSinceLastClaim < CLAIM_COOLDOWN_HOURS) {
-        const hoursRemaining = Math.ceil(
-          CLAIM_COOLDOWN_HOURS - hoursSinceLastClaim
-        )
-        return NextResponse.json(
-          {
-            error: `You must wait ${hoursRemaining} hours before claiming again`,
-          },
-          { status: 429 }
-        )
-      }
-    }
-
-    // Get agent's USDC wallet
-    const { data: wallet, error: walletError } = await supabase
+    // The agent's primary custody wallet receives the funds.
+    const { data: wallet } = await supabase
       .from('wallets')
-      .select('*')
-      .eq('agent_id', agent_id)
-      .eq('currency', 'USDC')
+      .select('id, balance, status')
+      .eq('agent_id', auth.agent.agentId)
       .eq('wallet_type', 'custody')
+      .eq('currency', 'USDC')
       .single()
 
-    if (walletError || !wallet) {
+    if (!wallet) {
       return NextResponse.json(
-        { error: 'Wallet not found. Create a wallet first.' },
+        { error: 'No USDC custody wallet found for this agent', code: 'WALLET_NOT_FOUND' },
         { status: 404 }
       )
     }
 
-    const txHash =
-      '0x' +
-      Array.from({ length: 64 }, () =>
-        Math.floor(Math.random() * 16).toString(16)
-      ).join('')
+    const txHash = randomTxHash()
+    const claimed = await claimFaucet({
+      agentId: auth.agent.agentId,
+      walletId: wallet.id,
+      amount: FAUCET_AMOUNT,
+      cooldownHours: CLAIM_COOLDOWN_HOURS,
+      txHash,
+    })
 
-    // Double-entry ledger: credit faucet funds
-    const newBalance = wallet.balance + FAUCET_AMOUNT
-    const { error: updateError } = await supabase
-      .from('wallets')
-      .update({ balance: newBalance })
-      .eq('id', wallet.id)
-
-    if (updateError) {
-      return NextResponse.json(
-        { error: 'Failed to add funds to wallet' },
-        { status: 500 }
-      )
+    if (!claimed.ok) {
+      return ledgerErrorResponse({ reason: claimed.reason, detail: claimed.detail })
     }
 
-    // Record ledger entry
-    await supabase.from('transactions').insert({
-      wallet_id: wallet.id,
-      type: 'deposit',
-      amount: FAUCET_AMOUNT,
-      fee: 0,
-      status: 'confirmed',
-      tx_hash: txHash,
-      protocol: 'faucet',
-      ledger_entry: 'credit',
-      confirmed_at: new Date().toISOString(),
-    })
-
-    // Record faucet claim
-    await supabase.from('faucet_claims').insert({
-      agent_id,
-      amount: FAUCET_AMOUNT,
-    })
-
-    // Audit log
     await supabase.from('audit_logs').insert({
-      agent_id,
+      agent_id: auth.agent.agentId,
       action: 'faucet_claim',
-      details: {
-        amount: FAUCET_AMOUNT,
+      details: { amount: FAUCET_AMOUNT, wallet_id: wallet.id, tx_hash: txHash },
+      ip_address: request.headers.get('x-forwarded-for') || undefined,
+    })
+
+    return NextResponse.json(
+      {
+        success: true,
+        claimed: FAUCET_AMOUNT,
+        unit: 'UNIT',
+        message: `You received ${FAUCET_AMOUNT / 100} USDC TEST tokens`,
+        wallet_id: wallet.id,
+        wallet_balance: claimed.balance,
+        claimed_at: claimed.claimedAt,
+        next_claim_after: new Date(
+          new Date(claimed.claimedAt).getTime() + CLAIM_COOLDOWN_HOURS * 3600_000
+        ).toISOString(),
         tx_hash: txHash,
       },
-      ip_address: request.headers.get('x-forwarded-for') || undefined,
-      user_agent: request.headers.get('user-agent') || undefined,
-    })
-
-    const response = {
-      success: true,
-      claimed: FAUCET_AMOUNT,
-      unit: 'UNIT',
-      message: `You received ${FAUCET_AMOUNT / 100} USDC TEST tokens`,
-      wallet_balance: newBalance,
-      tx_hash: txHash,
-    }
-
-    if (idempotencyKey) {
-      idempotencyStore.set(hashIdempotencyKey(idempotencyKey), {
-        response,
-        timestamp: Date.now(),
-      })
-    }
-
-    return NextResponse.json(response, {
-      status: 200,
-      ...(idempotencyKey && {
-        headers: { 'x-idempotency-key': idempotencyKey },
-      }),
-    })
+      { status: 201 }
+    )
   } catch (error) {
     console.error('Faucet error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
+}
+
+/** GET /api/v1/faucet — when may this agent claim again? */
+export async function GET(request: NextRequest) {
+  const auth = await requireAgent(request)
+  if (!auth.ok) return auth.response
+
+  const supabase = createServerClient()
+  const { data: claims } = await supabase
+    .from('faucet_claims')
+    .select('claimed_at')
+    .eq('agent_id', auth.agent.agentId)
+    .order('claimed_at', { ascending: false })
+    .limit(1)
+
+  const last = claims?.[0]?.claimed_at as string | undefined
+  const nextAllowed = last
+    ? new Date(new Date(last).getTime() + CLAIM_COOLDOWN_HOURS * 3600_000)
+    : null
+
+  return NextResponse.json({
+    amount: FAUCET_AMOUNT,
+    cooldown_hours: CLAIM_COOLDOWN_HOURS,
+    last_claim: last ?? null,
+    can_claim: !nextAllowed || nextAllowed <= new Date(),
+    next_claim_after: nextAllowed?.toISOString() ?? null,
+  })
 }
 
 export async function OPTIONS() {
   return new NextResponse(null, {
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers':
-        'Content-Type, x-api-key, x-idempotency-key',
+        'Content-Type, Authorization, x-api-key, x-idempotency-key',
     },
   })
 }

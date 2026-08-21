@@ -113,6 +113,17 @@ export async function generateWalletAddress(): Promise<{
 
 // -- API Key Generation --
 
+/**
+ * Hash an API key for storage and lookup.
+ *
+ * Deterministic, so an incoming key can be hashed and matched against
+ * `api_keys.key_hash` directly. The raw key is never stored.
+ */
+export function hashApiKey(apiKey: string): string {
+  const hash = nacl.hash(new TextEncoder().encode(apiKey))
+  return `sha512:${bytesToHex(hash.slice(0, 32))}`
+}
+
 export function generateApiKey(
   prefix: 'mog_test' | 'mog_live' = 'mog_test'
 ): { apiKey: string; keyHash: string } {
@@ -123,15 +134,7 @@ export function generateApiKey(
     .slice(0, 32)
   const apiKey = `${prefix}_${keyMaterial}`
 
-  // Hash the key for storage using Web Crypto
-  const encoder = new TextEncoder()
-  const keyBytes = encoder.encode(apiKey)
-  // Synchronous hash via subtle crypto is async, use sync alternative:
-  // We use tweetnacl's hash for deterministic output
-  const hash = nacl.hash(keyBytes)
-  const keyHash = `sha512:${bytesToHex(hash.slice(0, 32))}`
-
-  return { apiKey, keyHash }
+  return { apiKey, keyHash: hashApiKey(apiKey) }
 }
 
 // -- Idempotency Key Hashing --

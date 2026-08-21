@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAgent } from '@/lib/auth'
 import { createServerClient } from '@/lib/db'
 import { hashIdempotencyKey } from '@/lib/crypto'
 
@@ -19,15 +20,15 @@ setInterval(() => {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { agent_id, currency = 'USDC', wallet_type = 'custody' } = body
+    const auth = await requireAgent(request)
+    if (!auth.ok) return auth.response
 
-    if (!agent_id) {
-      return NextResponse.json(
-        { error: 'Agent ID is required' },
-        { status: 400 }
-      )
-    }
+    const body = await request.json()
+    const { currency = 'USDC', wallet_type = 'custody' } = body
+
+    // The owner is the authenticated agent. Taking `agent_id` from the body
+    // let any caller open wallets under someone else's identity.
+    const agent_id = auth.agent.agentId
 
     // Idempotency key enforcement
     const idempotencyKey = request.headers.get('x-idempotency-key')
@@ -143,17 +144,16 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAgent(request)
+    if (!auth.ok) return auth.response
+
     const { searchParams } = new URL(request.url)
-    const agent_id = searchParams.get('agent_id')
     const currency = searchParams.get('currency')
     const wallet_type = searchParams.get('wallet_type')
 
-    if (!agent_id) {
-      return NextResponse.json(
-        { error: 'Agent ID is required' },
-        { status: 400 }
-      )
-    }
+    // Always scoped to the caller; an `agent_id` parameter must not let one
+    // agent enumerate another's wallets.
+    const agent_id = auth.agent.agentId
 
     const supabase = createServerClient()
 

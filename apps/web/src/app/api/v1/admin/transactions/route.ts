@@ -1,9 +1,15 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/db'
+import { requireAdmin } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+// Operator-only: this returns every agent's data, so it is gated on the
+// admin key rather than any agent credential.
+export async function GET(request: NextRequest) {
+  const denied = requireAdmin(request)
+  if (denied) return denied.response
+
   try {
     const supabase = createServerClient()
 

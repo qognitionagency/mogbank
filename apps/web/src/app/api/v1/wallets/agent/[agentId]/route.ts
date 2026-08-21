@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAgent, requireSelf, requireWalletOwner } from '@/lib/auth'
 import { createServerClient } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
@@ -13,7 +14,12 @@ export async function GET(
   { params }: { params: Promise<{ agentId: string }> }
 ) {
   try {
+    const auth = await requireAgent(request)
+    if (!auth.ok) return auth.response
+
     const { agentId } = await params
+    const notSelf = requireSelf(auth.agent, agentId)
+    if (notSelf) return notSelf.response
     const supabase = createServerClient()
 
     const { data: wallets, error } = await supabase

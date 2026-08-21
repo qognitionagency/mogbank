@@ -97,6 +97,7 @@ Environment variables (Production, Preview, Development):
 | `NEXT_PUBLIC_PROVIDER` | `MogBank` |
 | `NEXT_PUBLIC_X402_ENABLED` | `true` |
 | `NEXT_PUBLIC_TESTNET_FAUCET_AMOUNT` | `10000` |
+| `ADMIN_API_KEY` | operator key for `/api/v1/admin/*` (encrypted); unset closes the admin surface |
 
 Deploy (from `apps/web`, CLI already authed):
 
@@ -182,6 +183,69 @@ so Render's health check fails (503) if the ledger is unreachable. Verify:
 curl https://mogbank-api.onrender.com/health
 # {"status":"ok","database":"connected",...}
 ```
+
+## 3b. Authentication and authorisation (web API)
+
+Three tiers, implemented in `apps/web/src/lib/auth.ts`:
+
+| Tier | Credential | Covers |
+|---|---|---|
+| public | none | `/api/abos`, `/api/agent`, `/.well-known/*`, `/api/health`, agent registration, browsing marketplace listings |
+| agent | `x-api-key` (or `Authorization: Bearer`) | everything that reads or moves one agent's money |
+| admin | `x-admin-key` | `/api/v1/admin/*` — the operator's view over every agent |
+
+Two rules the routes enforce:
+
+- **Authorisation is ownership, not identity.** Knowing a wallet or agent id is
+  never sufficient. `requireWalletOwner` / `requireSelf` re-derive the owner
+  from the database on every call, and a resource belonging to someone else is
+  reported as **404, not 403** — confirming that an id exists is itself a
+  disclosure. Endpoints no longer accept `agent_id` / `sender_agent_id` /
+  `seller_agent_id` / `buyer_agent_id` from the request body as an identity
+  claim; the caller's key decides who they are.
+- **Everything fails closed.** With `ADMIN_API_KEY` unset the admin surface
+  returns 503 rather than opening.
+
+`ADMIN_API_KEY` must be set in the Vercel project. The `/admin` page prompts
+for it and keeps it in `sessionStorage` for the tab only.
+
+> Before this, the web API had **no authentication at all**: every `x-api-key`
+> mention was a CORS allow-header, the `api_keys` table was written but never
+> read, and `/api/v1/admin/*` was world-readable. Registration could not have
+> worked as auth anyway — `api_keys.key_hash` was `VARCHAR(64)` holding a
+> 71-character hash, so every insert failed and the error was discarded (see
+> `db/migrations/001_api_key_storage.sql`).
+
+## 3c. Atomic money movement (web API)
+
+`apps/web/src/lib/ledger.ts` replaces the previous read-modify-write:
+
+```js
+const { balance } = await read(wallet)          // 100
+await update(wallet, { balance: balance - 30 }) // writes 70
+```
+
+Two concurrent transfers both read 100 and both wrote their own answer, so a
+debit was silently lost and money was created. Debit and credit were also
+separate statements, so an evicted invocation destroyed the amount in flight,
+and the compensating "rollback" wrote back the *stale* balance.
+
+Every operation is now a single SQL statement — one transaction, no interactive
+round-trips, which is also what lets it run over Neon's stateless HTTP driver.
+Balances are only ever written relative to themselves (`balance - $n`), so the
+row lock and `WHERE` re-check make lost updates impossible; later stages are
+gated on earlier ones, so the statement applies in full or changes nothing.
+
+Idempotency is now durable. It previously lived in a module-level `Map`, which
+on Vercel is empty on almost every invocation — so a retried transfer simply
+executed again, the exact double-spend the header exists to prevent.
+
+Verify with `npm run db:race`, which asserts the properties that matter:
+
+- 40 concurrent transfers → money conserved, one ledger row each
+- 10 concurrent transfers of 100 against a balance of 500 → exactly 5 win, balance floors at 0
+- 8 concurrent faucet claims → exactly 1 wins
+- 5 concurrent escrow releases → seller paid exactly once
 
 ## 4. Discovery (agent-facing)
 

@@ -92,10 +92,14 @@ export default function Dashboard() {
     }
 
     const parsed = JSON.parse(storedAgent)
+    // Agent-scoped endpoints authenticate with the key issued at registration.
+    const authHeaders: HeadersInit = parsed.api_key
+      ? { 'x-api-key': parsed.api_key }
+      : {}
     try {
       const [agentRes, walletRes] = await Promise.all([
-        fetch(`/api/v1/agents/${parsed.id}`),
-        fetch(`/api/v1/wallets/agent/${parsed.id}`),
+        fetch(`/api/v1/agents/${parsed.id}`, { headers: authHeaders }),
+        fetch(`/api/v1/wallets/agent/${parsed.id}`, { headers: authHeaders }),
       ])
 
       if (agentRes.ok) {
@@ -109,13 +113,13 @@ export default function Dashboard() {
         setWallet(w)
         setBalance(w.balance)
 
-        const txRes = await fetch(`/api/v1/wallets/${w.id}/transactions`)
+        const txRes = await fetch(`/api/v1/wallets/${w.id}/transactions`, { headers: authHeaders })
         if (txRes.ok) {
           const txData = await txRes.json()
           setTransactions(txData.transactions || txData || [])
         }
 
-        const ledgerRes = await fetch(`/api/v1/wallets/${w.id}/ledger`)
+        const ledgerRes = await fetch(`/api/v1/wallets/${w.id}/ledger`, { headers: authHeaders })
         if (ledgerRes.ok) {
           const ledgerData = await ledgerRes.json()
           setLedger(ledgerData.entries || ledgerData || [])
@@ -222,7 +226,12 @@ export default function Dashboard() {
 
   const finishRegistration = () => {
     if (!regResult) return
-    localStorage.setItem('mogbank_agent', JSON.stringify({ id: regResult.agent.id }))
+    // The API key is kept alongside the id: every agent-scoped endpoint now
+    // requires it, and this is the only copy the bank will ever hand out.
+    localStorage.setItem(
+      'mogbank_agent',
+      JSON.stringify({ id: regResult.agent.id, api_key: regResult.credentials.api_key })
+    )
     setLoading(true)
     fetchAgentData()
   }

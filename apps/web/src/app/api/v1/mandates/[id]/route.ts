@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAgent, requireSelf, requireVerifiedAgent } from '@/lib/auth'
 import { createServerClient } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
@@ -15,10 +16,13 @@ export async function OPTIONS() {
 
 // GET /api/v1/mandates/:id  — fetch a single mandate
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAgent(request)
+    if (!auth.ok) return auth.response
+
     const { id } = await params
     const supabase = createServerClient()
 
@@ -33,6 +37,11 @@ export async function GET(
         { error: 'Mandate not found' },
         { status: 404, headers: CORS }
       )
+    }
+
+    // A mandate id must not reveal another agent's delegation.
+    if (mandate.agent_id !== auth.agent.agentId) {
+      return NextResponse.json({ error: 'Mandate not found' }, { status: 404 })
     }
 
     const now = new Date()
@@ -52,24 +61,20 @@ export async function GET(
   }
 }
 
-// PATCH /api/v1/mandates/:id  — revoke a mandate
-// Body: { agent_id: string }  (must match mandate owner)
+// PATCH /api/v1/mandates/:id  — revoke a mandate (owner only, via API key)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAgent(request)
+    if (!auth.ok) return auth.response
+
     const { id } = await params
-    const body = await request.json()
-    const { agent_id } = body
 
-    if (!agent_id) {
-      return NextResponse.json(
-        { error: 'agent_id is required to revoke a mandate' },
-        { status: 400, headers: CORS }
-      )
-    }
-
+    // Ownership comes from the API key, not the body. This used to trust an
+    // `agent_id` field the caller supplied, so anyone could revoke anyone's
+    // mandate simply by naming its owner.
     const supabase = createServerClient()
 
     const { data: mandate, error: fetchError } = await supabase
@@ -85,10 +90,10 @@ export async function PATCH(
       )
     }
 
-    if (mandate.agent_id !== agent_id) {
+    if (mandate.agent_id !== auth.agent.agentId) {
       return NextResponse.json(
-        { error: 'Unauthorized — agent_id does not match mandate owner' },
-        { status: 403, headers: CORS }
+        { error: 'Mandate not found' },
+        { status: 404, headers: CORS }
       )
     }
 
@@ -112,7 +117,7 @@ export async function PATCH(
     }
 
     await supabase.from('audit_logs').insert({
-      agent_id,
+      agent_id: auth.agent.agentId,
       action: 'mandate_revoked',
       details: { mandate_id: id },
       ip_address: request.headers.get('x-forwarded-for') ?? undefined,

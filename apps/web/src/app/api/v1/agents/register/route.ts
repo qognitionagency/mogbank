@@ -198,12 +198,23 @@ export async function POST(request: NextRequest) {
       total_score: kyaScore,
     })
 
-    // Store API key hash
-    await supabase.from('api_keys').insert({
+    // Store the API key hash. This is what every later request authenticates
+    // against, so a failure here would leave the agent permanently locked out
+    // holding a key the bank has no record of — it must not be ignored.
+    const { error: apiKeyError } = await supabase.from('api_keys').insert({
       agent_id: agent.id,
       key_hash: keyHash,
       name: 'default',
     })
+
+    if (apiKeyError) {
+      console.error('API key storage failed:', apiKeyError)
+      await supabase.from('agents').delete().eq('id', agent.id)
+      return NextResponse.json(
+        { error: 'Failed to issue API credentials', details: apiKeyError },
+        { status: 500 }
+      )
+    }
 
     // Audit log
     await supabase.from('audit_logs').insert({

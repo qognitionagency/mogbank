@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAgent, requireSelf, requireVerifiedAgent } from '@/lib/auth'
 import { createServerClient } from '@/lib/db'
 import { signMandate } from '@/lib/crypto'
 import nacl from 'tweetnacl'
@@ -21,7 +22,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAgent(request)
+    if (!auth.ok) return auth.response
+
     const { id } = await params
+    const notSelf = requireSelf(auth.agent, id)
+    if (notSelf) return notSelf.response
     const supabase = createServerClient()
 
     const { data: agent, error } = await supabase
@@ -121,7 +127,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAgent(request)
+    if (!auth.ok) return auth.response
+
     const { id } = await params
+    const notSelf = requireSelf(auth.agent, id)
+    if (notSelf) return notSelf.response
     const supabase = createServerClient()
 
     const { data: agent, error } = await supabase
