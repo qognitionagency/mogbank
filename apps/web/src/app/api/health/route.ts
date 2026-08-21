@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { chainConfig, settlementEnabled } from '@/lib/chain'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,10 +25,17 @@ export async function GET() {
       services: {
         database,
         ...(databaseError ? { database_error: databaseError } : {}),
-        blockchain:
-          process.env.NEXT_PUBLIC_BLOCKCHAIN_ENABLED === 'true'
-            ? 'connected'
-            : 'simulated',
+        // Report what settlement actually is, not a flag someone can forget
+        // to flip. "simulated" here while real USDC moves would be a lie.
+        settlement: settlementEnabled()
+          ? {
+              status: 'enabled',
+              network: chainConfig().name,
+              chain_id: chainConfig().chainId,
+              asset: 'USDC',
+              testnet: chainConfig().testnet,
+            }
+          : { status: 'disabled', reason: 'No treasury configured' },
         redis: process.env.REDIS_URL ? 'connected' : 'unavailable',
       },
     },
