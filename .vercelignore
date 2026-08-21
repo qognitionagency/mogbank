@@ -1,12 +1,11 @@
 # Only apps/web is deployed (project Root Directory = apps/web); the rest of
-# the monorepo is dead weight in the upload. Paths are anchored with a leading
+# the repo is dead weight in the upload. Paths are anchored with a leading
 # slash so nested directories of the same name (apps/web/scripts) are kept.
 node_modules
 .next
-/apps/backend
 /packages
 /infrastructure
 /security
 /scripts
-/supabase
 /docs
+/db

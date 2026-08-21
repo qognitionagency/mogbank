@@ -77,9 +77,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createServerClient()
+    const db = createServerClient()
 
-    const { data: receiverAgent } = await supabase
+    const { data: receiverAgent } = await db
       .from('agents')
       .select('id, status')
       .eq('id', receiver_agent_id)
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Receiver agent is not active' }, { status: 403 })
     }
 
-    const { data: senderWallet } = await supabase
+    const { data: senderWallet } = await db
       .from('wallets')
       .select('id')
       .eq('agent_id', senderAgentId)
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: receiverWallet } = await supabase
+    const { data: receiverWallet } = await db
       .from('wallets')
       .select('id')
       .eq('agent_id', receiver_agent_id)
@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
     const value = outcome.value as { failure?: Failure }
     if (value.failure) return ledgerErrorResponse(value.failure)
 
-    await supabase.from('audit_logs').insert({
+    await db.from('audit_logs').insert({
       agent_id: senderAgentId,
       action: 'a2a_payment',
       details: { receiver_agent_id, amount, fee, currency },

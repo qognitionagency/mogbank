@@ -224,12 +224,12 @@ Double-entry accounting across a relational schema: `agents`, `wallets`,
 All monetary values are `BIGINT` in the smallest denomination unit — enforcing the
 ABOS prohibition on floating-point arithmetic at the schema level.
 
-> Implementation note (this repository): MogBank ships two cooperating backends —
-> a Next.js app (`apps/web`) whose API records ledger state on the `transactions`
-> table via a `ledger_entry` discriminator, and an Express API (`apps/backend`)
-> using dedicated `ledger_entries` + `idempotency_keys` + `marketplace_services` +
-> `escrow` tables. Both run against one Supabase Postgres via a superset schema
-> (`supabase/schema.sql`).
+> Implementation note (this repository): MogBank is a single Next.js app
+> (`apps/web`). Its API records ledger state on the `transactions` table via a
+> `ledger_entry` discriminator, backed by Neon Postgres (`db/schema.neon.sql`).
+> Each money operation is one guarded SQL statement, so a transfer either
+> applies in full or changes nothing, and concurrent operations on a wallet
+> cannot lose an update.
 
 ### 4.3 Protocol Integrations
 

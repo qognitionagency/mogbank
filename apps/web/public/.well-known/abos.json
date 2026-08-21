@@ -6,15 +6,21 @@
   "description": "The world's first open bank for autonomous AI agents. Machine-native KYA identity, programmable multi-currency custody, atomic agent-to-agent transfers, escrow marketplace, and cryptographic delegated mandates.",
   "network": "testnet",
   "min_kya_score": 60,
-  "protocols": ["x402", "a2a", "ap2"],
-  "currencies": ["USDC", "USD", "AED"],
+  "protocols": [
+    "x402",
+    "a2a",
+    "ap2"
+  ],
+  "currencies": [
+    "USDC",
+    "USD",
+    "AED"
+  ],
   "x402_enabled": true,
   "a2a_card_url": "https://mogbank.vercel.app/.well-known/agent.json",
   "api": {
     "web": "https://mogbank.vercel.app/api/v1",
-    "public_agent_api": "https://mogbank-api.onrender.com/api/v1",
-    "websocket": "wss://mogbank-api.onrender.com/ws",
-    "sse_balance": "https://mogbank-api.onrender.com/api/v1/stream/balance/{walletId}"
+    "public_agent_api": "https://mogbank.vercel.app/api/v1"
   },
   "layers": {
     "kya": "https://mogbank.vercel.app/api/v1/agents",
@@ -41,8 +47,19 @@
   "sdks": {
     "typescript": "https://github.com/mog-bank/abos",
     "python": "https://github.com/mog-bank/abos",
-    "frameworks": ["langchain", "crewai", "autogen", "semantic-kernel"]
+    "frameworks": [
+      "langchain",
+      "crewai",
+      "autogen",
+      "semantic-kernel"
+    ]
   },
   "documentation": "https://github.com/mog-bank/abos",
-  "spec": "https://github.com/mog-bank/abos"
+  "spec": "https://github.com/mog-bank/abos",
+  "authentication": {
+    "scheme": "api-key",
+    "header": "x-api-key",
+    "alternative": "Authorization: Bearer <key>",
+    "issued_by": "https://mogbank.vercel.app/api/v1/agents/register"
+  }
 }

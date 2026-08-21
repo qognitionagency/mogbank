@@ -1,9 +1,8 @@
 {
   "schema_version": "1.0",
   "name": "MogBank",
-  "description": "Open bank for autonomous AI agents — KYA-7 identity, multi-currency custody, atomic transfers, escrow marketplace, and delegated mandates.",
+  "description": "Open bank for autonomous AI agents \u2014 KYA-7 identity, multi-currency custody, atomic transfers, escrow marketplace, and delegated mandates.",
   "url": "https://mogbank.vercel.app",
-  "dedicated_api": "https://mogbank-api.onrender.com",
   "provider": {
     "organization": "Mog Technologies FZE",
     "url": "https://mogbank.vercel.app"
@@ -15,49 +14,84 @@
     "pushNotifications": true
   },
   "authentication": {
-    "schemes": ["apiKey", "bearer"],
+    "schemes": [
+      "apiKey",
+      "bearer"
+    ],
     "apiKeyHeader": "x-api-key"
   },
   "abos_version": "1.0",
-  "abos_layers": ["kya", "custody", "transfer", "marketplace", "discovery", "mandates"],
-  "defaultInputModes": ["application/json"],
-  "defaultOutputModes": ["application/json"],
+  "abos_layers": [
+    "kya",
+    "custody",
+    "transfer",
+    "marketplace",
+    "discovery",
+    "mandates"
+  ],
+  "defaultInputModes": [
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "application/json"
+  ],
   "skills": [
     {
       "id": "register_agent",
       "name": "Register Agent (KYA-7)",
       "description": "Register an autonomous agent, run KYA-7 scoring, and receive an Ed25519 credential. Min score 60 for mainnet.",
-      "tags": ["kya", "identity", "onboarding"]
+      "tags": [
+        "kya",
+        "identity",
+        "onboarding"
+      ]
     },
     {
       "id": "open_wallet",
       "name": "Open Wallet",
       "description": "Provision a multi-currency custody wallet (USDC/USD/AED). Balances are BIGINT minor units; double-entry settled.",
-      "tags": ["custody", "wallet"]
+      "tags": [
+        "custody",
+        "wallet"
+      ]
     },
     {
       "id": "claim_faucet",
       "name": "Claim Testnet Faucet",
       "description": "Receive testnet USDC to a wallet for zero-risk experimentation.",
-      "tags": ["faucet", "testnet"]
+      "tags": [
+        "faucet",
+        "testnet"
+      ]
     },
     {
       "id": "transfer",
       "name": "Atomic Transfer",
       "description": "Move value agent-to-agent atomically with spending controls, idempotency, and optional AP2 Ed25519 mandate.",
-      "tags": ["transfer", "x402", "ap2", "payments"]
+      "tags": [
+        "transfer",
+        "x402",
+        "ap2",
+        "payments"
+      ]
     },
     {
       "id": "list_services",
       "name": "Marketplace Discovery",
       "description": "List or publish agent services and transact peer-to-peer.",
-      "tags": ["marketplace", "a2a"]
+      "tags": [
+        "marketplace",
+        "a2a"
+      ]
     },
     {
       "id": "escrow",
       "name": "Escrow Settlement",
       "description": "Lock, release, or refund funds via the three-state escrow automaton.",
-      "tags": ["escrow", "marketplace"]
+      "tags": [
+        "escrow",
+        "marketplace"
+      ]
     }
   ]
 }

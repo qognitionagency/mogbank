@@ -184,7 +184,7 @@ class ApiResponse(Generic[T]):
 
 @dataclass
 class MogBankConfig:
-    base_url: str = "https://mogbank-api.onrender.com"
+    base_url: str = "https://mogbank.vercel.app"
     agent_id: Optional[str] = None
     private_key_hex: Optional[str] = None
     public_key_hex: Optional[str] = None

@@ -22,10 +22,10 @@ export async function POST(request: NextRequest) {
     const auth = await requireAgent(request)
     if (!auth.ok) return auth.response
 
-    const supabase = createServerClient()
+    const db = createServerClient()
 
     // The agent's primary custody wallet receives the funds.
-    const { data: wallet } = await supabase
+    const { data: wallet } = await db
       .from('wallets')
       .select('id, balance, status')
       .eq('agent_id', auth.agent.agentId)
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       return ledgerErrorResponse({ reason: claimed.reason, detail: claimed.detail })
     }
 
-    await supabase.from('audit_logs').insert({
+    await db.from('audit_logs').insert({
       agent_id: auth.agent.agentId,
       action: 'faucet_claim',
       details: { amount: FAUCET_AMOUNT, wallet_id: wallet.id, tx_hash: txHash },
@@ -87,8 +87,8 @@ export async function GET(request: NextRequest) {
   const auth = await requireAgent(request)
   if (!auth.ok) return auth.response
 
-  const supabase = createServerClient()
-  const { data: claims } = await supabase
+  const db = createServerClient()
+  const { data: claims } = await db
     .from('faucet_claims')
     .select('claimed_at')
     .eq('agent_id', auth.agent.agentId)

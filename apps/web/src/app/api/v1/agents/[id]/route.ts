@@ -15,9 +15,9 @@ export async function GET(
     const { id } = await params
     const notSelf = requireSelf(auth.agent, id)
     if (notSelf) return notSelf.response
-    const supabase = createServerClient()
+    const db = createServerClient()
 
-    const { data: agent, error } = await supabase
+    const { data: agent, error } = await db
       .from('agents')
       .select(`
         *,

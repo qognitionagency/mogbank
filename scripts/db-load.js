@@ -1,26 +1,45 @@
-// Loads supabase/schema.sql into the target database. Run with DB_HOST/DB_PASSWORD set.
+// Load db/schema.neon.sql into the target database.
+//
+//   DATABASE_URL="postgres://..." node scripts/db-load.js
+//
+// The schema is destructive and re-runnable: it drops and recreates every
+// table. Never point this at a database holding real data.
 const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
 async function main() {
-  const sql = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'schema.sql'), 'utf8');
-  const client = new Client({
-    host: process.env.DB_HOST,
-    port: parseInt(process.env.DB_PORT || '5432', 10),
-    user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD,
-    database: 'postgres',
-    ssl: { rejectUnauthorized: false },
-    connectionTimeoutMillis: 15000,
-  });
-  await client.connect();
-  console.log('Connected. Executing schema.sql ...');
-  await client.query(sql);
-  const t = await client.query(
-    `select table_name from information_schema.tables where table_schema='public' order by 1`
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    console.error('Set DATABASE_URL to the Neon connection string.');
+    process.exit(1);
+  }
+
+  const sql = fs.readFileSync(
+    path.join(__dirname, '..', 'db', 'schema.neon.sql'),
+    'utf8'
   );
-  console.log('OK. Tables now (' + t.rowCount + '):', t.rows.map(r => r.table_name).join(', '));
-  await client.end();
+
+  const client = new Client({
+    connectionString,
+    ssl: { rejectUnauthorized: true },
+  });
+
+  await client.connect();
+  try {
+    await client.query(sql);
+    const { rows } = await client.query(
+      `SELECT count(*)::int AS tables
+         FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`
+    );
+    console.log(`Schema loaded — ${rows[0].tables} tables.`);
+  } finally {
+    await client.end();
+  }
 }
-main().catch(e => { console.error('LOAD_ERROR:', e.message); process.exit(2); });
+
+main().catch((err) => {
+  console.error('Schema load failed:', err.message);
+  process.exit(1);
+});

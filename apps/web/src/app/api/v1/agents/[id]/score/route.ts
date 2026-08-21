@@ -23,9 +23,9 @@ export async function GET(
     const { id } = await params
     const notSelf = requireSelf(auth.agent, id)
     if (notSelf) return notSelf.response
-    const supabase = createServerClient()
+    const db = createServerClient()
 
-    const { data: agent, error } = await supabase
+    const { data: agent, error } = await db
       .from('agents')
       .select('id, kya_score, kya_status, kya_breakdown, agent_type, email, metadata, created_at, updated_at')
       .eq('id', id)
@@ -35,7 +35,7 @@ export async function GET(
       return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
     }
 
-    const { data: history } = await supabase
+    const { data: history } = await db
       .from('kya_score_history')
       .select('*')
       .eq('agent_id', id)

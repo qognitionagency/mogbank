@@ -24,9 +24,9 @@ export async function GET(
     if (!auth.ok) return auth.response
 
     const { id } = await params
-    const supabase = createServerClient()
+    const db = createServerClient()
 
-    const { data: mandate, error } = await supabase
+    const { data: mandate, error } = await db
       .from('mandates')
       .select('id, agent_id, principal_address, scope, constraints, nonce, revoked, expires_at, created_at, revoked_at')
       .eq('id', id)
@@ -75,9 +75,9 @@ export async function PATCH(
     // Ownership comes from the API key, not the body. This used to trust an
     // `agent_id` field the caller supplied, so anyone could revoke anyone's
     // mandate simply by naming its owner.
-    const supabase = createServerClient()
+    const db = createServerClient()
 
-    const { data: mandate, error: fetchError } = await supabase
+    const { data: mandate, error: fetchError } = await db
       .from('mandates')
       .select('id, agent_id, revoked')
       .eq('id', id)
@@ -104,7 +104,7 @@ export async function PATCH(
       )
     }
 
-    const { error: revokeError } = await supabase
+    const { error: revokeError } = await db
       .from('mandates')
       .update({ revoked: true, revoked_at: new Date().toISOString() })
       .eq('id', id)
@@ -116,7 +116,7 @@ export async function PATCH(
       )
     }
 
-    await supabase.from('audit_logs').insert({
+    await db.from('audit_logs').insert({
       agent_id: auth.agent.agentId,
       action: 'mandate_revoked',
       details: { mandate_id: id },

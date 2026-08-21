@@ -57,9 +57,9 @@ export async function POST(request: NextRequest) {
 
     // Mandate verification (ABOS Layer 6): a delegated authorisation signed by
     // the agent's Ed25519 key.
-    const supabase = createServerClient()
+    const db = createServerClient()
     if (mandate_signature && mandate_payload) {
-      const { data: agentRow } = await supabase
+      const { data: agentRow } = await db
         .from('agents')
         .select('public_key')
         .eq('id', auth.agent.agentId)
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     const fee = Math.round(amount * X402_FEE_RATE)
 
     // --- Spending controls (ABOS Layer 3) ---
-    const { data: controls } = await supabase
+    const { data: controls } = await db
       .from('spending_controls')
       .select('daily_limit, session_limit, allowed_currencies, counterparty_blocklist')
       .eq('agent_id', auth.agent.agentId)
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
 
       const midnight = new Date()
       midnight.setHours(0, 0, 0, 0)
-      const { data: todaysDebits } = await supabase
+      const { data: todaysDebits } = await db
         .from('transactions')
         .select('amount')
         .eq('wallet_id', from_wallet_id)

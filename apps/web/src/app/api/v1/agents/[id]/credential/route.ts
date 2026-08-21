@@ -28,9 +28,9 @@ export async function POST(
     const { id } = await params
     const notSelf = requireSelf(auth.agent, id)
     if (notSelf) return notSelf.response
-    const supabase = createServerClient()
+    const db = createServerClient()
 
-    const { data: agent, error } = await supabase
+    const { data: agent, error } = await db
       .from('agents')
       .select('id, wallet_address, public_key, principal_address, agent_type, kya_score, kya_status, email, metadata, created_at')
       .eq('id', id)
@@ -106,7 +106,7 @@ export async function POST(
     }
 
     // Audit log
-    await supabase.from('audit_logs').insert({
+    await db.from('audit_logs').insert({
       agent_id: agent.id,
       action: 'credential_issued',
       details: { kya_score: agent.kya_score, kya_status: agent.kya_status },
@@ -133,9 +133,9 @@ export async function GET(
     const { id } = await params
     const notSelf = requireSelf(auth.agent, id)
     if (notSelf) return notSelf.response
-    const supabase = createServerClient()
+    const db = createServerClient()
 
-    const { data: agent, error } = await supabase
+    const { data: agent, error } = await db
       .from('agents')
       .select('id, wallet_address, public_key, principal_address, agent_type, kya_score, kya_status, created_at')
       .eq('id', id)

@@ -43,10 +43,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const supabase = createServerClient()
+    const db = createServerClient()
 
     // Verify agent exists and is KYA-verified
-    const { data: agent, error: agentError } = await supabase
+    const { data: agent, error: agentError } = await db
       .from('agents')
       .select('id, kya_score, kya_status')
       .eq('id', agent_id)
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if wallet already exists
-    const { data: existing } = await supabase
+    const { data: existing } = await db
       .from('wallets')
       .select('*')
       .eq('agent_id', agent_id)
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: wallet, error } = await supabase
+    const { data: wallet, error } = await db
       .from('wallets')
       .insert({
         agent_id,
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Audit log
-    await supabase.from('audit_logs').insert({
+    await db.from('audit_logs').insert({
       agent_id,
       action: 'wallet_created',
       details: {
@@ -155,9 +155,9 @@ export async function GET(request: NextRequest) {
     // agent enumerate another's wallets.
     const agent_id = auth.agent.agentId
 
-    const supabase = createServerClient()
+    const db = createServerClient()
 
-    let query = supabase
+    let query = db
       .from('wallets')
       .select('*')
       .eq('agent_id', agent_id)

@@ -1,11 +1,11 @@
--- MogBank Database Schema — ABOS v1.0 (Neon / plain PostgreSQL)
+-- MogBank Database Schema — ABOS v1.0 (Neon / PostgreSQL)
 --
--- Generated from supabase/schema.sql. Identical tables, indexes, triggers and
--- functions; the Supabase-only blocks are omitted because Neon has neither:
---   • ROW LEVEL SECURITY policies keyed on auth.jwt()  — there is no PostgREST
---     layer here, so no anon/JWT role ever touches the database. Every query
---     arrives through the Next.js API routes over the owner connection.
---   • GRANTs to `service_role`                          — that role is Supabase's.
+-- The single source of truth for the database. Load it with:
+--   DATABASE_URL=... node scripts/db-load.js
+--
+-- There are no row-level security policies: the database has no public
+-- surface. Every query arrives through the Next.js API routes over the owner
+-- connection, and per-agent scoping is enforced there (apps/web/src/lib/auth.ts).
 --
 -- Re-runnable: DROPs and recreates all objects. DESTRUCTIVE on a populated
 -- database — back up first.
@@ -44,20 +44,19 @@ DROP FUNCTION IF EXISTS process_transfer(UUID, UUID, BIGINT, BIGINT, VARCHAR) CA
 -- ============================================================
 -- AGENTS  (Layer 1 — KYA Identity)
 -- ============================================================
--- Columns marked (web) are written by apps/web; (api) by apps/backend.
--- The two code paths populate different subsets, so identity columns are
--- nullable and the table is the union of both models.
+-- Identity columns are nullable: registration populates a subset, and the
+-- richer fields are filled in as an agent is verified.
 CREATE TABLE agents (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  wallet_address VARCHAR(44) UNIQUE,          -- (web) nullable: api path omits it
-  public_key VARCHAR(64),                      -- (web) nullable: api path may omit
-  principal_address VARCHAR(44),               -- (web)
+  wallet_address VARCHAR(44) UNIQUE,          -- nullable until derived
+  public_key VARCHAR(64),                      -- Ed25519 root of trust (Layer 1)
+  principal_address VARCHAR(44),               -- the human/org behind the agent
   agent_type VARCHAR(20) CHECK (agent_type IN ('langchain', 'crewai', 'autogen', 'custom', 'semantic_kernel')) DEFAULT 'custom',
   kya_score INTEGER DEFAULT 0 CHECK (kya_score >= 0 AND kya_score <= 100),
   kya_status VARCHAR(20) DEFAULT 'pending' CHECK (kya_status IN ('pending', 'in_review', 'verified', 'suspended', 'rejected')),
   email VARCHAR(255),
-  metadata JSONB DEFAULT '{}',                 -- (web)
-  -- (api) richer identity fields written by apps/backend
+  metadata JSONB DEFAULT '{}',
+  -- richer identity fields, filled in during verification
   name VARCHAR(255),
   company_name VARCHAR(255),
   jurisdiction VARCHAR(100),
@@ -77,7 +76,7 @@ CREATE TABLE agents (
 CREATE TABLE wallets (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-  address VARCHAR(64),                          -- (api) on-chain/derived address
+  address VARCHAR(64),                          -- on-chain/derived address
   currency VARCHAR(10) CHECK (currency IN ('USDC', 'AED', 'USD', 'DDSC')) DEFAULT 'USDC',
   balance BIGINT DEFAULT 0 CHECK (balance >= 0),
   locked_balance BIGINT DEFAULT 0 CHECK (locked_balance >= 0),
@@ -92,7 +91,6 @@ CREATE TABLE wallets (
 
 -- ============================================================
 -- TRANSACTIONS  (Layer 3 — Atomic Value Transfer)
--- Superset of what apps/web and apps/backend both write.
 -- ============================================================
 CREATE TABLE transactions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -117,7 +115,10 @@ CREATE TABLE transactions (
 
 -- ============================================================
 -- LEDGER ENTRIES  (Layer 3 — append-only double-entry ledger)
--- Written by apps/backend (services/ledger.ts). Immutable by convention.
+-- Append-only by convention.
+-- NOTE: currently unused. It belonged to the removed Express service; kept so
+-- the data model stays available if the richer catalogue is wanted again.
+-- See the todo list in CLAUDE.md before dropping it.
 -- ============================================================
 CREATE TABLE ledger_entries (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -191,10 +192,12 @@ CREATE TABLE escrow_orders (
 );
 
 -- ============================================================
--- MARKETPLACE_SERVICES  (Layer 4 — apps/backend service catalog)
--- The Express API uses a richer service model than the web `services`
--- table (per-call pricing, ratings, OpenAPI schema). Kept separate so
--- both code paths run unmodified against one database.
+-- MARKETPLACE_SERVICES  (Layer 4 — richer service catalogue)
+-- Per-call pricing, ratings and OpenAPI schema, versus the simpler
+-- `services` table the API actually uses.
+-- NOTE: currently unused. It belonged to the removed Express service; kept so
+-- the data model stays available if the richer catalogue is wanted again.
+-- See the todo list in CLAUDE.md before dropping it.
 -- ============================================================
 CREATE TABLE marketplace_services (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -214,7 +217,10 @@ CREATE TABLE marketplace_services (
 );
 
 -- ============================================================
--- ESCROW  (Layer 4 — apps/backend wallet-to-wallet escrow)
+-- ESCROW  (Layer 4 — wallet-to-wallet escrow)
+-- NOTE: currently unused. It belonged to the removed Express service; kept so
+-- the data model stays available if the richer catalogue is wanted again.
+-- See the todo list in CLAUDE.md before dropping it.
 -- ============================================================
 CREATE TABLE escrow (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -346,7 +352,8 @@ CREATE TRIGGER trg_mkt_services_updated_at  BEFORE UPDATE ON marketplace_service
 CREATE TRIGGER trg_escrow_updated_at        BEFORE UPDATE ON escrow        FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- ============================================================
--- Atomic transfer helper (used by apps/backend optional path)
+-- Atomic transfer helper. The API does not call this — see
+-- apps/web/src/lib/ledger.ts — but it is a useful primitive from psql.
 -- ============================================================
 CREATE OR REPLACE FUNCTION process_transfer(
   p_from_wallet_id UUID,

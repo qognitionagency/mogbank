@@ -8,13 +8,10 @@
 
 ### 1. Deploy to Vercel
 
-```bash
-cd apps/web
-vercel login
-vercel --prod
-```
-
-Or connect your GitHub repository to Vercel at: https://vercel.com
+The `mogbank` Vercel project is connected to this repo with production branch
+`main`, so **pushing to `main` deploys**. To deploy from a working copy instead,
+run `vercel --prod` from the repo root (the project's Root Directory is
+`apps/web`).
 
 ### 2. Set Up the Neon Database
 
@@ -125,14 +122,16 @@ mogbank/
 │   │   │   ├── faucet/       # Testnet faucet
 │   │   │   ├── developers/   # API docs
 │   │   │   └── api/          # API routes (6 layers)
-│   │   ├── lib/              # db.ts (Neon data layer) + crypto.ts
+│   │   ├── lib/              # auth.ts, ledger.ts, db.ts, crypto.ts, api.ts
 │   │   └── types/            # TypeScript types
 │   ├── vercel.json
-│   └── scripts/              # db:smoke integration test
+│   └── scripts/              # db:smoke + db:race integration tests
 ├── db/
-│   └── schema.neon.sql       # Database schema (deployed)
-├── supabase/
-│   └── schema.sql            # Superseded — Supabase-era original
+│   ├── schema.neon.sql       # Database schema (deployed)
+│   └── migrations/           # Numbered, applied in order
+├── packages/                 # Framework SDKs (python, typescript, langchain, …)
+├── docs/                     # Deployment guide + technical paper
+├── CLAUDE.md                 # Project state and todo list — read this first
 └── README.md
 ```
 

@@ -11,9 +11,9 @@ export async function GET(request: NextRequest) {
   if (denied) return denied.response
 
   try {
-    const supabase = createServerClient()
+    const db = createServerClient()
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('transactions')
       .select('*')
       .order('created_at', { ascending: false })

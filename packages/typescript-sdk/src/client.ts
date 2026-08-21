@@ -29,7 +29,7 @@ export class MogBankClient {
 
   constructor(config: MogBankConfig) {
     this.config = {
-      baseUrl: 'https://mogbank-api.onrender.com',
+      baseUrl: 'https://mogbank.vercel.app',
       timeout: 30000,
       retries: 3,
       apiKey: '',

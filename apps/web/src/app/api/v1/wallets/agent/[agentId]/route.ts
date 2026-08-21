@@ -20,9 +20,9 @@ export async function GET(
     const { agentId } = await params
     const notSelf = requireSelf(auth.agent, agentId)
     if (notSelf) return notSelf.response
-    const supabase = createServerClient()
+    const db = createServerClient()
 
-    const { data: wallets, error } = await supabase
+    const { data: wallets, error } = await db
       .from('wallets')
       .select('*')
       .eq('agent_id', agentId)

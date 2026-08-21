@@ -1,14 +1,13 @@
 /**
- * Neon data layer — a PostgREST-shaped query builder over plain PostgreSQL.
+ * Neon data layer — a small chainable query builder over plain PostgreSQL.
  *
- * MogBank's database lives on Neon. Neon is plain PostgreSQL: there is no
- * PostgREST gateway in front of it, so `supabase-js` cannot talk to it. The
- * API routes, however, were all written against supabase-js's query builder.
+ * MogBank's database is Neon. This module gives the API routes a fluent way to
+ * express ordinary reads and writes, compiling each chain into one
+ * parameterised SQL statement executed over Neon's stateless HTTP driver.
  *
- * Rather than rewrite ~6k lines of route code (and risk moving money
- * incorrectly while doing it), this module reimplements the exact slice of
- * that builder the routes use, compiling each chain into one parameterised SQL
- * statement executed over Neon's HTTP driver.
+ * Anything that moves money does NOT go through here — see `@/lib/ledger`,
+ * where each operation is a single guarded statement so it cannot interleave
+ * badly with a concurrent one.
  *
  * Supported surface (everything `src/app/api` actually calls):
  *   .from(t).select(cols) / .insert(row|rows) / .update(patch) / .delete()
@@ -42,7 +41,7 @@ const PG_TIMESTAMP = 1114
 const PG_TIMESTAMPTZ = 1184
 
 /**
- * Match PostgREST's JSON output for the types the routes are sensitive to.
+ * Normalise the types the routes are sensitive to.
  * node-postgres hands back int8/numeric as strings and timestamps as Date
  * objects; both would break route arithmetic or change response payloads.
  */
@@ -383,7 +382,7 @@ function renderFilters(
 }
 
 /**
- * Parse PostgREST's `.or()` string form: `col.op.value,col2.op.value`.
+ * Parse the `.or()` string form: `col.op.value,col2.op.value`.
  * Only the comparison operators the routes use are accepted.
  */
 function parseOr(expression: string): Filter[] {
@@ -406,7 +405,7 @@ function parseOr(expression: string): Filter[] {
 }
 
 // ---------------------------------------------------------------------------
-// Select list parsing (including PostgREST resource embedding)
+// Select list parsing (including related-resource embedding)
 // ---------------------------------------------------------------------------
 
 interface Embed {
@@ -419,7 +418,7 @@ interface Embed {
   /**
    * 'one'  — this table holds the FK, so the embed is a single object or null
    * 'many' — the other table holds the FK, so the embed is an array
-   * matching PostgREST's cardinality rules.
+   * following the direction of the foreign key.
    */
   cardinality: 'one' | 'many'
   /** table being embedded */
@@ -532,8 +531,8 @@ function renderSelectList(
         : embed.columns.map((c) => `e.${quoteIdent(c)}`).join(', ')
     const rows = `SELECT ${projection} FROM ${targetTable} e WHERE ${joinOn}`
 
-    // PostgREST returns a single object (or null) for a many-to-one embed and
-    // an array (empty, never null) for a one-to-many embed.
+    // A many-to-one embed yields a single object (or null); a one-to-many
+    // embed yields an array, empty rather than null.
     pieces.push(
       embed.cardinality === 'one'
         ? `(SELECT to_jsonb(sub) FROM (${rows}) sub) AS ${quoteIdent(embed.alias)}`
@@ -571,11 +570,9 @@ export interface Result<T> {
 }
 
 /**
- * Rows are intentionally loose. supabase-js returns `any` when no generated
- * database types are supplied, and every route was written against that; the
- * routes index freely into results and do arithmetic on them. Tightening this
- * is a worthwhile follow-up, but it belongs with generated schema types rather
- * than here.
+ * Rows are intentionally loose: the routes index freely into results and do
+ * arithmetic on them. Tightening this is a worthwhile follow-up, but it
+ * belongs with generated schema types rather than here.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = Record<string, any>
@@ -885,7 +882,7 @@ class QueryBuilder<T = any[]> implements PromiseLike<Result<T>> {
 
   /**
    * Mutations only return rows when the caller chained `.select()`, matching
-   * PostgREST's `Prefer: return=representation`.
+   * an explicit request to return the affected rows.
    */
   private renderReturning(meta: TableMeta, alias: string): string {
     if (this.selectSpec === null) return ''
@@ -910,7 +907,7 @@ export class NeonClient {
     return new QueryBuilder(table)
   }
 
-  /** Call a PostgreSQL function, mirroring supabase-js `.rpc()`. */
+  /** Call a PostgreSQL function. */
   async rpc(fn: string, args: Row = {}): Promise<Result<unknown>> {
     try {
       const params = new Params()
@@ -940,10 +937,9 @@ export function createClient(): NeonClient {
 /**
  * Server-side client used by the API routes for every read and write.
  *
- * Named for the role rather than the vendor: there is no anon/JWT tier here.
- * Neon has no PostgREST gateway, so the database is only ever reached from
- * route handlers over the pooled owner connection, and the row scoping that
- * Supabase RLS used to provide must be enforced in the handlers themselves.
+ * The database has no public surface: it is only ever reached from server-side
+ * route handlers over the pooled owner connection. Row scoping is therefore
+ * enforced in the handlers — see `@/lib/auth`.
  *
  * WARNING: never expose this client, or the connection string, to the browser.
  */

@@ -65,7 +65,9 @@ function calculateKYA7(
   return { score: Math.min(100, total), breakdown }
 }
 
-// In-memory idempotency store (Vercel ephemeral; production uses Supabase)
+// In-memory idempotency store. Vercel invocations are ephemeral, so this is
+// best-effort only. The money routes use the durable idempotency_keys table
+// instead; see the todo list in CLAUDE.md about moving this one over too.
 const idempotencyStore = new Map<
   string,
   { response: unknown; timestamp: number }
@@ -127,10 +129,10 @@ export async function POST(request: NextRequest) {
     )
     const kyaStatus = kyaScore >= 60 ? 'verified' : 'pending'
 
-    const supabase = createServerClient()
+    const db = createServerClient()
 
     // Insert agent
-    const { data: agent, error: agentError } = await supabase
+    const { data: agent, error: agentError } = await db
       .from('agents')
       .insert({
         wallet_address: walletAddress,
@@ -158,7 +160,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create default wallet
-    const { data: wallet, error: walletError } = await supabase
+    const { data: wallet, error: walletError } = await db
       .from('wallets')
       .insert({
         agent_id: agent.id,
@@ -175,7 +177,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create spending controls
-    await supabase.from('spending_controls').insert({
+    await db.from('spending_controls').insert({
       agent_id: agent.id,
       daily_limit: 1_000_000_000, // 1M USDC cents (10k USD)
       session_limit: 100_000_000,
@@ -186,7 +188,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Store KYA score history
-    await supabase.from('kya_score_history').insert({
+    await db.from('kya_score_history').insert({
       agent_id: agent.id,
       principal_identity_score: breakdown.principal_identity,
       email_domain_score: breakdown.email_domain,
@@ -201,7 +203,7 @@ export async function POST(request: NextRequest) {
     // Store the API key hash. This is what every later request authenticates
     // against, so a failure here would leave the agent permanently locked out
     // holding a key the bank has no record of — it must not be ignored.
-    const { error: apiKeyError } = await supabase.from('api_keys').insert({
+    const { error: apiKeyError } = await db.from('api_keys').insert({
       agent_id: agent.id,
       key_hash: keyHash,
       name: 'default',
@@ -209,7 +211,7 @@ export async function POST(request: NextRequest) {
 
     if (apiKeyError) {
       console.error('API key storage failed:', apiKeyError)
-      await supabase.from('agents').delete().eq('id', agent.id)
+      await db.from('agents').delete().eq('id', agent.id)
       return NextResponse.json(
         { error: 'Failed to issue API credentials', details: apiKeyError },
         { status: 500 }
@@ -217,7 +219,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Audit log
-    await supabase.from('audit_logs').insert({
+    await db.from('audit_logs').insert({
       agent_id: agent.id,
       action: 'agent_registered',
       details: {

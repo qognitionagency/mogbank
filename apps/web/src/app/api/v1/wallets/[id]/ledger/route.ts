@@ -26,9 +26,9 @@ export async function GET(
     const { searchParams } = new URL(request.url)
     const limit = Math.min(parseInt(searchParams.get('limit') || '100', 10), 500)
 
-    const supabase = createServerClient()
+    const db = createServerClient()
 
-    const { data: rows, error } = await supabase
+    const { data: rows, error } = await db
       .from('transactions')
       .select('*')
       .eq('wallet_id', id)

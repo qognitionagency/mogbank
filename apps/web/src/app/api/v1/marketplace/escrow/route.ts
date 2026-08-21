@@ -24,11 +24,11 @@ const CORS = {
  * visibly left the buyer's custody wallet without yet reaching the seller.
  */
 async function escrowWalletFor(
-  supabase: ReturnType<typeof createServerClient>,
+  db: ReturnType<typeof createServerClient>,
   agentId: string,
   currency: string
 ): Promise<string | null> {
-  const { data: existing } = await supabase
+  const { data: existing } = await db
     .from('wallets')
     .select('id')
     .eq('agent_id', agentId)
@@ -38,7 +38,7 @@ async function escrowWalletFor(
 
   if (existing?.id) return existing.id
 
-  const { data: created } = await supabase
+  const { data: created } = await db
     .from('wallets')
     .insert({
       agent_id: agentId,
@@ -75,9 +75,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createServerClient()
+    const db = createServerClient()
 
-    const { data: service } = await supabase
+    const { data: service } = await db
       .from('services')
       .select('id, seller_agent_id, price, currency, status')
       .eq('id', service_id)
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: buyerWallet } = await supabase
+    const { data: buyerWallet } = await db
       .from('wallets')
       .select('id')
       .eq('agent_id', auth.agent.agentId)
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
     }
 
     const holdingWalletId = await escrowWalletFor(
-      supabase,
+      db,
       auth.agent.agentId,
       currency
     )
@@ -235,9 +235,9 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const supabase = createServerClient()
+    const db = createServerClient()
 
-    const { data: escrow } = await supabase
+    const { data: escrow } = await db
       .from('escrow_orders')
       .select('id, buyer_agent_id, seller_agent_id, amount, status')
       .eq('id', escrow_id)
@@ -265,7 +265,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const holdingWalletId = await escrowWalletFor(
-      supabase,
+      db,
       escrow.buyer_agent_id,
       currency
     )
@@ -273,7 +273,7 @@ export async function PUT(request: NextRequest) {
     const destinationAgentId =
       action === 'release' ? escrow.seller_agent_id : escrow.buyer_agent_id
 
-    const { data: destination } = await supabase
+    const { data: destination } = await db
       .from('wallets')
       .select('id')
       .eq('agent_id', destinationAgentId)
@@ -329,7 +329,7 @@ export async function PUT(request: NextRequest) {
     const value = outcome.value as { failure?: Failure }
     if (value.failure) return ledgerErrorResponse(value.failure)
 
-    await supabase.from('audit_logs').insert({
+    await db.from('audit_logs').insert({
       agent_id: auth.agent.agentId,
       action: `escrow_${action}`,
       details: { escrow_id: escrow.id, amount: escrow.amount },
@@ -351,14 +351,14 @@ export async function GET(request: NextRequest) {
   const auth = await requireVerifiedAgent(request)
   if (!auth.ok) return auth.response
 
-  const supabase = createServerClient()
-  const { data: asBuyer } = await supabase
+  const db = createServerClient()
+  const { data: asBuyer } = await db
     .from('escrow_orders')
     .select('*')
     .eq('buyer_agent_id', auth.agent.agentId)
     .order('created_at', { ascending: false })
 
-  const { data: asSeller } = await supabase
+  const { data: asSeller } = await db
     .from('escrow_orders')
     .select('*')
     .eq('seller_agent_id', auth.agent.agentId)

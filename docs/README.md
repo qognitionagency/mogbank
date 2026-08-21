@@ -15,7 +15,7 @@ bank belongs to machines.
 |---|---|
 | [technical-paper.md](./technical-paper.md) | *Agentic Open Banking* — the technical paper introducing the Structural Incompatibility Thesis, ABOS, and MogBank. |
 | [abos-spec-v1.0.md](./abos-spec-v1.0.md) | The full ABOS v1.0 specification (six layers, conformance, security). |
-| [DEPLOYMENT.md](./DEPLOYMENT.md) | Production topology and exact (re)deploy steps for Vercel + Render + Supabase. |
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | Production topology and exact (re)deploy steps for Vercel + Neon. |
 | [DESIGN-SYSTEM.md](./DESIGN-SYSTEM.md) | The MogBank web design system — tokens, `mog-*` utilities, and `@/components/ui` components. Canonical UI reference for `apps/web`. |
 
 See also: [`../SPEC.md`](../SPEC.md), [`../security/`](../security/), and the

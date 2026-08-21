@@ -34,8 +34,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = createServerClient()
-    const { data: mandates, error } = await supabase
+    const db = createServerClient()
+    const { data: mandates, error } = await db
       .from('mandates')
       .select('id, agent_id, principal_address, scope, constraints, nonce, revoked, expires_at, created_at, revoked_at')
       .eq('agent_id', agentId)
@@ -111,10 +111,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createServerClient()
+    const db = createServerClient()
 
     // -- Verify agent exists and has verified KYA status --
-    const { data: agent, error: agentError } = await supabase
+    const { data: agent, error: agentError } = await db
       .from('agents')
       .select('id, public_key, kya_status')
       .eq('id', agent_id)
@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
     }
 
     // -- Nonce replay prevention: reject if nonce already used --
-    const { data: existingNonce } = await supabase
+    const { data: existingNonce } = await db
       .from('mandates')
       .select('id')
       .eq('agent_id', agent_id)
@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
     }
 
     // -- Persist mandate --
-    const { data: mandate, error: insertError } = await supabase
+    const { data: mandate, error: insertError } = await db
       .from('mandates')
       .insert({
         agent_id,
@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
     }
 
     // -- Audit log --
-    await supabase.from('audit_logs').insert({
+    await db.from('audit_logs').insert({
       agent_id,
       action: 'mandate_registered',
       details: {

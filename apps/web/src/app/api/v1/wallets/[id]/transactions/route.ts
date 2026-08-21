@@ -24,9 +24,9 @@ export async function GET(
     const { searchParams } = new URL(request.url)
     const limit = Math.min(parseInt(searchParams.get('limit') || '100', 10), 500)
 
-    const supabase = createServerClient()
+    const db = createServerClient()
 
-    const { data: transactions, error } = await supabase
+    const { data: transactions, error } = await db
       .from('transactions')
       .select('*')
       .or(`wallet_id.eq.${id},counterparty_wallet_id.eq.${id}`)

@@ -468,7 +468,7 @@ export default function Admin() {
                   <li>Rate Limiting: 100 req/min per agent</li>
                   <li>Input Validation: Zod schemas</li>
                   <li>Audit Logging: Immutable ledger</li>
-                  <li>Data Source: Supabase (live)</li>
+                  <li>Data Source: Neon Postgres (live)</li>
                 </ul>
               </div>
             </div>

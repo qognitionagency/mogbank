@@ -23,9 +23,9 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || 'active'
     const seller_agent_id = searchParams.get('seller_agent_id')
 
-    const supabase = createServerClient()
+    const db = createServerClient()
 
-    let query = supabase
+    let query = db
       .from('services')
       .select('*, agents:seller_agent_id(wallet_address, agent_type)')
       .eq('status', status)
@@ -95,10 +95,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const supabase = createServerClient()
+    const db = createServerClient()
 
     // Verify seller agent exists and is KYA-verified
-    const { data: agent } = await supabase
+    const { data: agent } = await db
       .from('agents')
       .select('id, kya_status')
       .eq('id', seller_agent_id)
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: service, error } = await supabase
+    const { data: service, error } = await db
       .from('services')
       .insert({
         seller_agent_id,
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Audit log
-    await supabase.from('audit_logs').insert({
+    await db.from('audit_logs').insert({
       agent_id: seller_agent_id,
       action: 'service_listed',
       details: {

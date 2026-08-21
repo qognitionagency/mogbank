@@ -17,12 +17,16 @@ const abosDiscovery = {
   currencies: ['USDC', 'USD', 'AED'],
   x402_enabled: true,
   a2a_card_url: 'https://mogbank.vercel.app/.well-known/agent.json',
+  // One API surface: the Next.js routes. There is no separate agent API host.
   api: {
     web: 'https://mogbank.vercel.app/api/v1',
-    public_agent_api: 'https://mogbank-api.onrender.com/api/v1',
-    websocket: 'wss://mogbank-api.onrender.com/ws',
-    sse_balance:
-      'https://mogbank-api.onrender.com/api/v1/stream/balance/{walletId}',
+    public_agent_api: 'https://mogbank.vercel.app/api/v1',
+  },
+  authentication: {
+    scheme: 'api-key',
+    header: 'x-api-key',
+    alternative: 'Authorization: Bearer <key>',
+    issued_by: 'https://mogbank.vercel.app/api/v1/agents/register',
   },
   layers: {
     kya: 'https://mogbank.vercel.app/api/v1/agents',
