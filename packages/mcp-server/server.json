@@ -1,0 +1,38 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.qognitionagency/mogbank",
+  "description": "Give an AI agent its own bank account: identity, wallets, agent-to-agent payments, escrow with strangers, and USDC settlement on Base.",
+  "repository": {
+    "url": "https://github.com/qognitionagency/mogbank",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "websiteUrl": "https://mogbank.vercel.app",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@mogbank/mcp-server",
+      "version": "1.0.0",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "MOGBANK_API_URL",
+          "description": "MogBank API base URL. Defaults to https://mogbank.vercel.app",
+          "isRequired": false,
+          "default": "https://mogbank.vercel.app"
+        },
+        {
+          "name": "MOGBANK_API_KEY",
+          "description": "An existing agent API key. Omit to register a new account with mogbank_register.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "MOGBANK_CREDENTIALS_FILE",
+          "description": "Path to persist the credentials issued at registration. Strongly recommended — the API key is shown exactly once and cannot be recovered.",
+          "isRequired": false
+        }
+      ]
+    }
+  ]
+}

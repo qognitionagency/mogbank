@@ -7,10 +7,18 @@ recently changed and why, and what is still outstanding.
 
 ## What this is
 
-A bank whose account holders are autonomous AI agents, not people. Agents
-register, are scored, hold wallets, and pay each other over the API with no
-human in the loop. The human operator's role is to **watch**: `/admin` is a
-read-only view over every agent, wallet and transaction.
+**Settlement between agents that do not trust each other.**
+
+Two agents inside one company can settle on a spreadsheet. Two agents from
+different companies cannot: no shared ledger, no shared legal entity, no reason
+for either to pay first. MogBank supplies the identity (KYA), the escrow, and a
+neutral ledger neither party owns. That gap is the wedge — a plain wallet gives
+an agent a balance, but it does not give a stranger a reason to deal with it.
+Positioning across the README, the landing copy and the discovery documents
+should stay pointed at that, not at "payments" generally.
+
+No human approves a payment. The human sets the mandate once and the agent
+operates inside it; `/admin` is a read-only view for the operator.
 
 ABOS v1.0 reference implementation, six layers:
 
@@ -27,7 +35,14 @@ ABOS v1.0 reference implementation, six layers:
 
 **One app.** `apps/web` — Next.js 16 (App Router) on Vercel, both the UI and
 the entire API. **One database.** Neon Postgres, reached only from server-side
-route handlers.
+route handlers. **One settlement rail.** USDC on Base.
+
+Money model: a custodial ledger with the chain only at the boundary.
+Agent-to-agent payments are off-chain — instant, atomic, free, because putting a
+$0.003 API call on a blockchain costs more in gas than the payment is worth.
+Value enters via a verified on-chain deposit and leaves via a treasury payout.
+This is how custodial exchanges work and it is the only split that is both fast
+enough for agents and settled in something real.
 
 There is no separate backend service and no Render. An Express API
 (`apps/backend`) and `render.yaml` existed but were never deployed; they were
@@ -47,6 +62,7 @@ apps/web/src/
   lib/
     auth.ts               who is calling, and what they may touch
     ledger.ts             all money movement — atomic, one statement each
+    chain.ts              Base/USDC settlement: verify deposits, send payouts
     db.ts                 chainable query builder over Neon (non-money reads)
     crypto.ts             Ed25519 keys, mandate signatures, API key hashing
     api.ts                shared response helpers
@@ -63,6 +79,12 @@ db/
   to `main` deploys.**
 - **Database:** Neon `ep-odd-cherry-axa8rct2` (us-east-2), always via the
   **pooler** host.
+- **Settlement:** Base **Sepolia** (chain 84532), USDC
+  `0x036CbD53842c5426634e7929541eC2318f3dCF7e`. Treasury
+  `0xc069c8Be3e2b52ddE98A4556B408c06c9CFc440F` — **unfunded**. Fund it with test
+  ETH (gas) and test USDC from https://faucet.circle.com before withdrawals can
+  succeed; deposits verify without it.
+- **MCP server:** `packages/mcp-server`, 22 tools. Built, not yet published.
 - **Env vars** (Vercel): `DATABASE_URL`, `ADMIN_SESSION_SECRET`, `ADMIN_EMAILS`,
   `ADMIN_OAUTH_ORIGIN`, `CREDENTIAL_ISSUER_SEED`, `NEXT_PUBLIC_ABOS_VERSION`,
   `NEXT_PUBLIC_PROVIDER`, `NEXT_PUBLIC_X402_ENABLED`,
@@ -139,6 +161,21 @@ releases pay the seller once.
       tree file fail to index with "short read". **Nothing was lost**: GitHub
       had every commit, and the current tree was rebuilt from a fresh clone.
 
+### Settlement
+
+- [ ] **Fund the treasury** (see Key facts). Withdrawals fail closed until then
+      — verified: a failed broadcast restores the debited balance exactly.
+- [ ] **Reconcile `pending` withdrawals.** If a process dies between reserving
+      a withdrawal and broadcasting it, the row stays `pending`. Nothing sweeps
+      those yet; a cron that checks the chain and either completes or refunds
+      them is the missing piece.
+- [ ] **Confirmations.** Deposits are credited at 1 confirmation, which is fine
+      for testnet. Raise it before mainnet.
+- [ ] **Mainnet is an explicit act.** `SETTLEMENT_NETWORK=base` switches to real
+      money. Do not do it until the treasury key lives in a KMS rather than an
+      environment variable, and until you have the licence position settled —
+      holding customer funds and moving them is money transmission.
+
 ### Correctness
 
 - [ ] **Durable idempotency for the three non-money routes.** `agents/register`,
@@ -165,11 +202,19 @@ releases pay the seller once.
 
 ### Distribution
 
-- [ ] **Publish `@mogbank/mcp-server` to npm** so `npx -y @mogbank/mcp-server`
-      works for anyone. It is built and tested but not yet published.
-- [ ] **List it in MCP directories** (modelcontextprotocol/servers, mcp.so,
-      Smithery, Glama). This is how a developer finds it — agents do not
-      discover banks on their own, developers wire them in.
+- [ ] **Publish `@mogbank/mcp-server` to npm.** Packaged and verified
+      (`npm pack --dry-run` → 8 files, 13.6 kB). Needs your npm account:
+      ```
+      npm login
+      cd packages/mcp-server && npm publish --access public
+      ```
+      The `@mogbank` scope is unclaimed, so publishing also claims it. Until
+      then `npx -y @mogbank/mcp-server` will not resolve.
+- [ ] **List it in the MCP directories.** `server.json` is written to the
+      registry schema. Submit to: the official registry
+      (github.com/modelcontextprotocol/registry), mcp.so, Smithery, Glama.
+      This is the actual distribution channel — agents do not discover banks,
+      developers wire them in.
 - [ ] The other `packages/*` SDK stubs (langchain, crewai, autogen, semantic
       kernel, python, typescript) are scaffolding and have not been verified
       against the current authenticated API.

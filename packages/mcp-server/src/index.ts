@@ -63,6 +63,14 @@ function fail(error: unknown): ToolResult {
       DAILY_LIMIT_EXCEEDED: 'This agent has hit its daily spending control.',
       SESSION_LIMIT_EXCEEDED: 'The amount exceeds this agent’s per-transaction limit.',
       INVALID_AMOUNT: 'Amounts are whole cents — 100 means one dollar.',
+      SETTLEMENT_DISABLED: 'This deployment has no treasury configured, so on-chain deposits and withdrawals are unavailable.',
+      ALREADY_CREDITED: 'That transaction has already been credited. Each hash can only be deposited once.',
+      TX_NOT_FOUND: 'No such transaction on the settlement chain. Check the hash and the network.',
+      TX_NOT_CONFIRMED: 'The transaction has not confirmed yet. Wait a few seconds and try again.',
+      WRONG_RECIPIENT: 'That transfer did not go to the bank treasury. Call mogbank_settlement_info for the correct address.',
+      NOT_A_USDC_TRANSFER: 'That transaction did not transfer USDC on the settlement chain.',
+      DUST_AMOUNT: 'Deposits must be a whole number of cents (a multiple of 0.01 USDC).',
+      BROADCAST_FAILED: 'The payout could not be broadcast and your balance was restored. The treasury may be out of gas.',
     }
     const hint = error.code ? remedy[error.code] : undefined
     return {
@@ -520,6 +528,106 @@ server.registerTool(
   async () => {
     try {
       return ok(await client.request('GET', '/api/v1/marketplace/escrow'))
+    } catch (error) {
+      return fail(error)
+    }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Settlement — real USDC on Base
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'mogbank_settlement_info',
+  {
+    title: 'How to deposit and withdraw real USDC',
+    description:
+      'Return the chain, the USDC contract, and the treasury address to send deposits to. ' +
+      'Call this before attempting a deposit. On testnet the funds are not real; the response says which network is in use.',
+    inputSchema: {},
+  },
+  async () => {
+    try {
+      return ok(await client.request('GET', '/api/v1/settlement', { auth: false }))
+    } catch (error) {
+      return fail(error)
+    }
+  }
+)
+
+server.registerTool(
+  'mogbank_deposit',
+  {
+    title: 'Credit an on-chain USDC deposit',
+    description:
+      'Credit USDC that has already been sent on-chain to the bank\u2019s treasury address. ' +
+      'Send the USDC first (see mogbank_settlement_info), wait for the transaction to confirm, then pass its hash here. ' +
+      'The amount and sender are read back from the chain \u2014 they are not taken from you. ' +
+      'A hash can only ever be credited once.',
+    inputSchema: {
+      tx_hash: z
+        .string()
+        .describe('The 0x-prefixed transaction hash of the USDC transfer into the treasury.'),
+    },
+  },
+  async ({ tx_hash }) => {
+    try {
+      return ok(
+        await client.request('POST', '/api/v1/settlement/deposits', {
+          body: { tx_hash },
+        })
+      )
+    } catch (error) {
+      return fail(error)
+    }
+  }
+)
+
+server.registerTool(
+  'mogbank_withdraw',
+  {
+    title: 'Withdraw USDC on-chain',
+    description:
+      'Send USDC from this agent\u2019s wallet to an address on the settlement chain. ' +
+      'The wallet is debited and the payout recorded before anything is broadcast; if the broadcast fails the balance is restored. ' +
+      'Returns a transaction hash and an explorer link.',
+    inputSchema: {
+      to_address: z.string().describe('Destination EVM address (0x...).'),
+      amount: z.number().int().positive().describe(CENTS),
+      wallet_id: z
+        .string()
+        .optional()
+        .describe('Defaults to this agent\u2019s USDC custody wallet.'),
+    },
+  },
+  async ({ to_address, amount, wallet_id }) => {
+    try {
+      return ok(
+        await client.request('POST', '/api/v1/settlement/withdrawals', {
+          body: { to_address, amount, wallet_id },
+        })
+      )
+    } catch (error) {
+      return fail(error)
+    }
+  }
+)
+
+server.registerTool(
+  'mogbank_settlement_history',
+  {
+    title: 'On-chain deposits and withdrawals',
+    description: 'This agent\u2019s settlement history \u2014 every deposit credited and payout sent, with transaction hashes.',
+    inputSchema: {},
+  },
+  async () => {
+    try {
+      const [deposits, withdrawals] = await Promise.all([
+        client.request('GET', '/api/v1/settlement/deposits'),
+        client.request('GET', '/api/v1/settlement/withdrawals'),
+      ])
+      return ok({ deposits, withdrawals })
     } catch (error) {
       return fail(error)
     }

@@ -47,6 +47,7 @@ export type LedgerFailure =
   | 'WALLET_NOT_ACTIVE'
   | 'CURRENCY_MISMATCH'
   | 'COOLDOWN_ACTIVE'
+  | 'ALREADY_CREDITED'
 
 export type LedgerResult<T> =
   | ({ ok: true } & T)
@@ -556,4 +557,195 @@ export async function withIdempotency<T>(
     ]).catch(() => {})
     throw err
   }
+}
+
+// ---------------------------------------------------------------------------
+// On-chain settlement
+// ---------------------------------------------------------------------------
+
+export interface CreditDepositParams {
+  agentId: string
+  walletId: string
+  amount: number
+  txHash: string
+  chainId: number
+  tokenAddress: string
+  fromAddress: string
+  confirmations: number
+}
+
+/**
+ * Credit a verified on-chain deposit.
+ *
+ * The whole thing is one statement so the wallet credit and the deposit record
+ * cannot come apart. `onchain_deposits.tx_hash` is UNIQUE and the insert is
+ * `ON CONFLICT DO NOTHING`, so a replayed hash matches no rows and credits
+ * nothing — the double-credit guard is the database constraint, not a check
+ * the application might race past.
+ */
+export async function creditDeposit(
+  params: CreditDepositParams
+): Promise<LedgerResult<{ balance: number; depositId: string }>> {
+  const rows = await query<{
+    balance: number | null
+    deposit_id: string | null
+  }>(
+    `
+    WITH claimed AS (
+      INSERT INTO onchain_deposits
+        (agent_id, wallet_id, tx_hash, chain_id, token_address,
+         from_address, amount, confirmations)
+      SELECT $1::uuid, $2::uuid, $3, $4::int, $5, $6, $7::bigint, $8::int
+       WHERE EXISTS (
+               SELECT 1 FROM wallets
+                WHERE id = $2::uuid AND agent_id = $1::uuid AND status = 'active'
+             )
+      ON CONFLICT (tx_hash) DO NOTHING
+      RETURNING id
+    ),
+    credited AS (
+      UPDATE wallets w
+         SET balance = w.balance + $7::bigint, updated_at = NOW()
+       WHERE w.id = $2::uuid
+         AND (SELECT count(*) FROM claimed) = 1
+      RETURNING w.balance
+    ),
+    tx AS (
+      INSERT INTO transactions
+        (wallet_id, type, amount, fee, status, ledger_entry, tx_hash, protocol, metadata, confirmed_at)
+      SELECT $2::uuid, 'deposit', $7::bigint, 0, 'confirmed', 'credit', $3, 'onchain',
+             jsonb_build_object('chain_id', $4::int, 'from', $6, 'token', $5), NOW()
+       WHERE (SELECT count(*) FROM credited) = 1
+      RETURNING id
+    )
+    SELECT (SELECT balance FROM credited)      AS balance,
+           (SELECT id::text FROM claimed)      AS deposit_id
+    `,
+    [
+      params.agentId,
+      params.walletId,
+      params.txHash,
+      params.chainId,
+      params.tokenAddress,
+      params.fromAddress,
+      params.amount,
+      params.confirmations,
+    ]
+  )
+
+  const row = rows[0]
+  if (!row || row.balance === null || row.deposit_id === null) {
+    const seen = await query<{ id: string }>(
+      `SELECT id FROM onchain_deposits WHERE tx_hash = $1`,
+      [params.txHash]
+    )
+    if (seen.length > 0) {
+      return {
+        ok: false,
+        reason: 'ALREADY_CREDITED',
+        detail: { tx_hash: params.txHash },
+      }
+    }
+    return { ok: false, ...(await diagnose(params.walletId, null, 0)) }
+  }
+  return { ok: true, balance: row.balance, depositId: row.deposit_id }
+}
+
+/**
+ * Reserve a withdrawal: debit the wallet and record the intent, atomically,
+ * *before* anything is broadcast.
+ *
+ * Debiting first is deliberate. If the broadcast then fails the funds are
+ * returned by `failWithdrawal`; if the process dies between the two, a
+ * `pending` row is left behind for reconciliation. The other order — broadcast
+ * then debit — can pay real money out and never record it, which is
+ * unrecoverable.
+ */
+export async function reserveWithdrawal(params: {
+  agentId: string
+  walletId: string
+  amount: number
+  toAddress: string
+  chainId: number
+}): Promise<LedgerResult<{ withdrawalId: string; balance: number }>> {
+  const rows = await query<{
+    withdrawal_id: string | null
+    balance: number | null
+  }>(
+    `
+    WITH debited AS (
+      UPDATE wallets w
+         SET balance = w.balance - $3::bigint, updated_at = NOW()
+       WHERE w.id = $2::uuid
+         AND w.agent_id = $1::uuid
+         AND w.status = 'active'
+         AND w.balance >= $3::bigint
+      RETURNING w.balance
+    ),
+    reserved AS (
+      INSERT INTO onchain_withdrawals
+        (agent_id, wallet_id, to_address, amount, chain_id, status)
+      SELECT $1::uuid, $2::uuid, $4, $3::bigint, $5::int, 'pending'
+       WHERE (SELECT count(*) FROM debited) = 1
+      RETURNING id
+    )
+    SELECT (SELECT id::text FROM reserved) AS withdrawal_id,
+           (SELECT balance FROM debited)   AS balance
+    `,
+    [params.agentId, params.walletId, params.amount, params.toAddress, params.chainId]
+  )
+
+  const row = rows[0]
+  if (!row || row.withdrawal_id === null || row.balance === null) {
+    return { ok: false, ...(await diagnose(params.walletId, null, params.amount)) }
+  }
+  return { ok: true, withdrawalId: row.withdrawal_id, balance: row.balance }
+}
+
+/** Record a successful broadcast against a reserved withdrawal. */
+export async function markWithdrawalSubmitted(
+  withdrawalId: string,
+  txHash: string
+): Promise<void> {
+  await query(
+    `
+    WITH updated AS (
+      UPDATE onchain_withdrawals
+         SET status = 'submitted', tx_hash = $2, submitted_at = NOW()
+       WHERE id = $1::uuid AND status = 'pending'
+      RETURNING wallet_id, amount
+    )
+    INSERT INTO transactions
+      (wallet_id, type, amount, fee, status, ledger_entry, tx_hash, protocol, confirmed_at)
+    SELECT wallet_id, 'withdrawal', amount, 0, 'confirmed', 'debit', $2, 'onchain', NOW()
+      FROM updated
+    `,
+    [withdrawalId, txHash]
+  )
+}
+
+/**
+ * Return the funds when a broadcast fails.
+ *
+ * Guarded on the row still being `pending`, so a retry cannot refund twice.
+ */
+export async function failWithdrawal(
+  withdrawalId: string,
+  reason: string
+): Promise<void> {
+  await query(
+    `
+    WITH failed AS (
+      UPDATE onchain_withdrawals
+         SET status = 'failed', error = $2
+       WHERE id = $1::uuid AND status = 'pending'
+      RETURNING wallet_id, amount
+    )
+    UPDATE wallets w
+       SET balance = w.balance + f.amount, updated_at = NOW()
+      FROM failed f
+     WHERE w.id = f.wallet_id
+    `,
+    [withdrawalId, reason.slice(0, 500)]
+  )
 }

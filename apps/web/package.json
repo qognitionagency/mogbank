@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:smoke": "node --env-file-if-exists=.env.local --import ./scripts/register-alias.mjs scripts/db-smoke.mts",
-    "db:race": "node --env-file-if-exists=.env.local --import ./scripts/register-alias.mjs scripts/ledger-race.mts"
+    "db:race": "node --env-file-if-exists=.env.local --import ./scripts/register-alias.mjs scripts/ledger-race.mts",
+    "seed:marketplace": "node --env-file-if-exists=.env.local --import ./scripts/register-alias.mjs scripts/seed-marketplace.mts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

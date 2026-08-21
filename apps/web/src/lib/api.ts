@@ -12,6 +12,7 @@ const LEDGER_STATUS: Record<LedgerFailure, number> = {
   WALLET_NOT_ACTIVE: 409,
   CURRENCY_MISMATCH: 400,
   COOLDOWN_ACTIVE: 429,
+  ALREADY_CREDITED: 409,
 }
 
 const LEDGER_MESSAGE: Record<LedgerFailure, string> = {
@@ -20,6 +21,7 @@ const LEDGER_MESSAGE: Record<LedgerFailure, string> = {
   WALLET_NOT_ACTIVE: 'Wallet is not active',
   CURRENCY_MISMATCH: 'Wallets hold different currencies',
   COOLDOWN_ACTIVE: 'Cooldown period has not elapsed',
+  ALREADY_CREDITED: 'This transaction has already been credited',
 }
 
 /**

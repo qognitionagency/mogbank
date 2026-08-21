@@ -106,7 +106,7 @@ CREATE TABLE transactions (
   -- double-entry discriminator used by the web app's transactions-backed ledger
   ledger_entry VARCHAR(20) CHECK (ledger_entry IN ('debit', 'credit', 'fee_debit')),
   tx_hash VARCHAR(100),
-  protocol VARCHAR(20) CHECK (protocol IN ('x402', 'a2a', 'ap2', 'escrow', 'faucet', 'internal', 'standard')),
+  protocol VARCHAR(20) CHECK (protocol IN ('x402', 'a2a', 'ap2', 'escrow', 'faucet', 'internal', 'standard', 'onchain')),
   metadata JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -304,6 +304,51 @@ CREATE TABLE kya_score_history (
   total_score INTEGER DEFAULT 0,
   calculated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+
+-- ============================================================
+-- ON-CHAIN SETTLEMENT (deposits / withdrawals at the custody boundary)
+-- ============================================================
+-- A confirmed USDC transfer into the treasury, credited to an agent's wallet.
+-- tx_hash is UNIQUE: that constraint, not application logic, is what stops the
+-- same deposit being claimed twice.
+CREATE TABLE onchain_deposits (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  agent_id      UUID NOT NULL REFERENCES agents(id)  ON DELETE CASCADE,
+  wallet_id     UUID NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+  tx_hash       TEXT NOT NULL UNIQUE,
+  chain_id      INTEGER NOT NULL,
+  token_address TEXT NOT NULL,
+  from_address  TEXT,
+  amount        BIGINT NOT NULL CHECK (amount > 0),   -- ledger cents
+  confirmations INTEGER,
+  credited_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_onchain_deposits_agent ON onchain_deposits(agent_id);
+
+-- A payout. The row is created in the same statement that debits the wallet,
+-- before anything is broadcast, so a crash mid-flight leaves a 'pending' row
+-- to reconcile rather than money that left with no record.
+CREATE TABLE onchain_withdrawals (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  agent_id      UUID NOT NULL REFERENCES agents(id)  ON DELETE CASCADE,
+  wallet_id     UUID NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+  to_address    TEXT NOT NULL,
+  amount        BIGINT NOT NULL CHECK (amount > 0),   -- ledger cents
+  chain_id      INTEGER NOT NULL,
+  status        VARCHAR(20) NOT NULL DEFAULT 'pending'
+                CHECK (status IN ('pending', 'submitted', 'confirmed', 'failed')),
+  tx_hash       TEXT,
+  error         TEXT,
+  requested_at  TIMESTAMPTZ DEFAULT NOW(),
+  submitted_at  TIMESTAMPTZ,
+  confirmed_at  TIMESTAMPTZ
+);
+
+CREATE INDEX idx_onchain_withdrawals_agent  ON onchain_withdrawals(agent_id);
+CREATE INDEX idx_onchain_withdrawals_status ON onchain_withdrawals(status);
+
 
 -- ============================================================
 -- INDEXES

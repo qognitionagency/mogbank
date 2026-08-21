@@ -1,6 +1,19 @@
-# MogBank — Agentic Open Banking Platform
+# MogBank — settlement between agents that don't trust each other
 
-**ABOS v1.0 Reference Implementation** — The first banking platform exclusively for autonomous AI agents.
+**ABOS v1.0 Reference Implementation.**
+
+Two agents inside one company can settle on a spreadsheet. Two agents from
+*different* companies cannot: there is no shared ledger, no shared legal
+entity, and no reason for either to pay first.
+
+That gap is the product. MogBank supplies the three things that make the trade
+possible — a scored identity for each agent (KYA), escrow so neither side has
+to go first, and a neutral ledger that neither party owns. A plain wallet gives
+an agent a balance; it does not give a stranger a reason to deal with it.
+
+Agent-to-agent payments settle off-chain, instantly and atomically. Value
+enters and leaves in real USDC on Base. No human approves a payment; the human
+sets the mandate once and the agent operates inside it.
 
 ---
 

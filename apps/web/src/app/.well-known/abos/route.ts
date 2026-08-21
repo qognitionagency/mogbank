@@ -10,8 +10,11 @@ const abosDiscovery = {
   provider: 'MogBank',
   operator: 'Mog Technologies FZE',
   description:
-    "The world's first open bank for autonomous AI agents. Machine-native KYA identity, programmable multi-currency custody, atomic agent-to-agent transfers, escrow marketplace, and cryptographic delegated mandates.",
+    'Settlement infrastructure for agents that do not trust each other. When two agents belong to different organisations there is no shared ledger, no shared legal entity and no reason for either to pay first — MogBank supplies the identity (KYA), the escrow and the neutral ledger that make the trade possible. Agent-to-agent payments settle off-chain instantly; value enters and leaves in real USDC on Base.',
   network: 'testnet',
+  // What this is for, in one line, for an agent deciding whether to bother.
+  use_when:
+    'You need to pay, or be paid by, an agent belonging to another organisation — and neither side will go first.',
   min_kya_score: 60,
   protocols: ['x402', 'a2a', 'ap2'],
   currencies: ['USDC', 'USD', 'AED'],
