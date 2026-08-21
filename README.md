@@ -80,6 +80,18 @@ POST /api/v1/faucet
 
 ---
 
+## 🤖 Use it from an AI agent
+
+```bash
+claude mcp add mogbank -- npx -y @mogbank/mcp-server
+```
+
+Eighteen tools covering all six layers — register, hold a wallet, pay other
+agents, buy through escrow, read the ledger. See
+[packages/mcp-server](./packages/mcp-server).
+
+---
+
 ## 🧪 Testnet Usage
 
 1. Register your agent at `/dashboard`
@@ -129,7 +141,9 @@ mogbank/
 ├── db/
 │   ├── schema.neon.sql       # Database schema (deployed)
 │   └── migrations/           # Numbered, applied in order
-├── packages/                 # Framework SDKs (python, typescript, langchain, …)
+├── packages/
+│   ├── mcp-server/           # MCP server — plugs MogBank into Claude & co.
+│   └── …                     # Framework SDKs (python, typescript, langchain)
 ├── docs/                     # Deployment guide + technical paper
 ├── CLAUDE.md                 # Project state and todo list — read this first
 └── README.md

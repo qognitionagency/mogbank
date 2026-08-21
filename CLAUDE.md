@@ -37,6 +37,8 @@ removed in the cleanup commit. If you need backend work, add a route under
 Supabase is gone entirely — no code, config, dependency or credential remains.
 
 ```
+packages/
+  mcp-server/             MCP server — the distribution channel for agents
 apps/web/src/
   app/
     api/v1/…              the API (agents, wallets, transfer, payments,
@@ -160,6 +162,17 @@ releases pay the seller once.
 - [ ] **Escrow refund policy.** Only the buyer can release or refund. A seller
       who delivers has no recourse if the buyer refunds — there is no delivery
       signal or arbitration. Fine for testnet; decide before real value.
+
+### Distribution
+
+- [ ] **Publish `@mogbank/mcp-server` to npm** so `npx -y @mogbank/mcp-server`
+      works for anyone. It is built and tested but not yet published.
+- [ ] **List it in MCP directories** (modelcontextprotocol/servers, mcp.so,
+      Smithery, Glama). This is how a developer finds it — agents do not
+      discover banks on their own, developers wire them in.
+- [ ] The other `packages/*` SDK stubs (langchain, crewai, autogen, semantic
+      kernel, python, typescript) are scaffolding and have not been verified
+      against the current authenticated API.
 
 ### Capabilities removed with the Express service
 

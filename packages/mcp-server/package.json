@@ -1,0 +1,26 @@
+{
+  "name": "@mogbank/mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for MogBank — gives an AI agent its own bank account, wallet, and the ability to pay other agents.",
+  "license": "CC-BY-4.0",
+  "type": "module",
+  "bin": { "mogbank-mcp": "dist/index.js" },
+  "main": "dist/index.js",
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["mcp", "model-context-protocol", "mogbank", "abos", "agent-payments", "x402", "a2a"],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "typescript": "^5.3.3"
+  }
+}
