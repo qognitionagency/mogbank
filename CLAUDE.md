@@ -61,11 +61,15 @@ db/
   to `main` deploys.**
 - **Database:** Neon `ep-odd-cherry-axa8rct2` (us-east-2), always via the
   **pooler** host.
-- **Env vars** (Vercel, all three targets): `DATABASE_URL`, `ADMIN_API_KEY`,
-  `CREDENTIAL_ISSUER_SEED`, `NEXT_PUBLIC_ABOS_VERSION`, `NEXT_PUBLIC_PROVIDER`,
-  `NEXT_PUBLIC_X402_ENABLED`, `NEXT_PUBLIC_TESTNET_FAUCET_AMOUNT`.
-- **Admin access:** open `/admin`, paste the `ADMIN_API_KEY` value. Held in
-  `sessionStorage` for that tab only.
+- **Env vars** (Vercel): `DATABASE_URL`, `ADMIN_SESSION_SECRET`, `ADMIN_EMAILS`,
+  `ADMIN_OAUTH_ORIGIN`, `CREDENTIAL_ISSUER_SEED`, `NEXT_PUBLIC_ABOS_VERSION`,
+  `NEXT_PUBLIC_PROVIDER`, `NEXT_PUBLIC_X402_ENABLED`,
+  `NEXT_PUBLIC_TESTNET_FAUCET_AMOUNT`. Still needed: `GOOGLE_CLIENT_ID`,
+  `GOOGLE_CLIENT_SECRET`.
+- **Admin access:** `/admin` → Sign in with Google. Exactly one address is
+  authorised (`ADMIN_EMAILS`, default `hello@qognitionagency.com`). There is no
+  shared admin key — it was removed deliberately, because a key authenticates
+  whoever holds it rather than a person.
 
 ## Two rules that must not regress
 
@@ -107,6 +111,17 @@ releases pay the seller once.
 
 ### Do these first
 
+- [ ] **Finish admin sign-in.** The admin surface is built and fails closed; it
+      needs a Google OAuth client before it will let anyone in.
+      1. https://console.cloud.google.com/apis/credentials → Create credentials
+         → OAuth client ID → Web application.
+      2. Authorised redirect URI:
+         `https://mogbank.vercel.app/api/admin/auth/callback`
+         (add `http://localhost:3000/api/admin/auth/callback` for local work).
+      3. Put the Client ID and Secret into Vercel as `GOOGLE_CLIENT_ID` and
+         `GOOGLE_CLIENT_SECRET`, then redeploy.
+      Until then `/api/v1/admin/*` returns 503 and `/admin` explains what is
+      missing.
 - [ ] **Rotate the Neon password.** `npg_TY6msStHW4Uc` was shared in plaintext
       in chat. Neon → Roles → reset `neondb_owner`, then update `DATABASE_URL`
       in Vercel and in `apps/web/.env.local`.

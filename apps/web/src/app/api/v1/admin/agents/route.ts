@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 // Operator-only: this returns every agent's data, so it is gated on the
 // admin key rather than any agent credential.
 export async function GET(request: NextRequest) {
-  const denied = requireAdmin(request)
+  const denied = await requireAdmin(request)
   if (denied) return denied.response
 
   try {

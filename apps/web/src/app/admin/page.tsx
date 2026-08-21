@@ -46,45 +46,57 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
   const [loading, setLoading] = useState(true)
 
-  // The admin endpoints expose every agent's data, so they are gated on the
-  // operator key. It is held in sessionStorage rather than a cookie so it is
-  // never sent automatically with a cross-site request, and is gone when the
-  // tab closes.
-  const [adminKey, setAdminKey] = useState('')
-  const [keyPrompt, setKeyPrompt] = useState('')
+  // Admin access is bound to a person via Google sign-in, not to a shared
+  // key. The session lives in an httpOnly cookie the browser sends
+  // automatically, so there is no credential for this page to hold.
+  const [session, setSession] = useState<{
+    authenticated: boolean
+    email: string | null
+    sso_configured: boolean
+    allowed: string[]
+  } | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
 
   useEffect(() => {
-    const stored = sessionStorage.getItem('mogbank_admin_key')
-    if (stored) setAdminKey(stored)
-    else setLoading(false)
+    const reason = new URLSearchParams(window.location.search).get('auth_error')
+    if (reason) {
+      setAuthError(
+        {
+          not_authorised: 'That Google account is not authorised for this bank.',
+          email_unverified: 'That Google account has no verified email address.',
+          not_configured: 'Google sign-in is not configured on this deployment.',
+          cancelled: 'Sign-in was cancelled.',
+          bad_state: 'Sign-in expired or was tampered with. Please try again.',
+        }[reason] ?? 'Sign-in failed. Please try again.'
+      )
+      window.history.replaceState({}, '', '/admin')
+    }
+
+    fetch('/api/admin/auth/session')
+      .then((r) => r.json())
+      .then((data) => {
+        setSession(data)
+        if (!data.authenticated) setLoading(false)
+      })
+      .catch(() => setLoading(false))
   }, [])
 
-  const fetchData = useCallback(async (key: string) => {
-    if (!key) return
+  const fetchData = useCallback(async () => {
     try {
-      const headers = { 'x-admin-key': key }
       const [agentsRes, walletsRes, txRes] = await Promise.all([
-        fetch('/api/v1/admin/agents', { headers }),
-        fetch('/api/v1/admin/wallets', { headers }),
-        fetch('/api/v1/admin/transactions', { headers }),
+        fetch('/api/v1/admin/agents'),
+        fetch('/api/v1/admin/wallets'),
+        fetch('/api/v1/admin/transactions'),
       ])
 
-      if (agentsRes.status === 401) {
-        sessionStorage.removeItem('mogbank_admin_key')
-        setAdminKey('')
-        setAuthError('That admin key was not accepted.')
-        return
-      }
-      if (agentsRes.status === 503) {
-        setAuthError('Admin access is not configured on this deployment (ADMIN_API_KEY is unset).')
+      if (agentsRes.status === 401 || agentsRes.status === 503) {
+        setSession((prev) => (prev ? { ...prev, authenticated: false } : prev))
         return
       }
 
       const agentData = await agentsRes.json()
       const walletData = await walletsRes.json()
       const txData = await txRes.json()
-      setAuthError(null)
       if (agentData.agents) setAgents(agentData.agents)
       if (walletData.wallets) setWallets(walletData.wallets)
       if (txData.transactions) setTransactions(txData.transactions)
@@ -96,20 +108,15 @@ export default function Admin() {
   }, [])
 
   useEffect(() => {
-    if (!adminKey) return
-    fetchData(adminKey)
-    const interval = setInterval(() => fetchData(adminKey), 30000)
+    if (!session?.authenticated) return
+    fetchData()
+    const interval = setInterval(fetchData, 30000)
     return () => clearInterval(interval)
-  }, [adminKey, fetchData])
+  }, [session?.authenticated, fetchData])
 
-  const unlock = (event: React.FormEvent) => {
-    event.preventDefault()
-    const key = keyPrompt.trim()
-    if (!key) return
-    sessionStorage.setItem('mogbank_admin_key', key)
-    setKeyPrompt('')
-    setLoading(true)
-    setAdminKey(key)
+  const signOut = async () => {
+    await fetch('/api/admin/auth/logout', { method: 'POST' })
+    window.location.href = '/admin'
   }
 
   const getAgentWallet = (agentId: string) => wallets.find(w => w.agent_id === agentId)
@@ -154,41 +161,53 @@ export default function Admin() {
   const formatBalance = (amount: number) => '$' + (amount / 100).toFixed(2)
   const formatTime = (ts: string) => new Date(ts).toLocaleString()
 
-  // Locked until the operator supplies the admin key.
-  if (!adminKey) {
+  // Signed out, or not authorised.
+  if (session && !session.authenticated) {
     return (
       <div className="mog-bg min-h-screen text-[#d0d0e0]">
         <TopNav />
         <div className="flex items-center justify-center py-32 px-6">
-          <form onSubmit={unlock} className="mog-card w-full max-w-md p-8">
+          <div className="mog-card w-full max-w-md p-8">
             <h1 className="font-display text-xl font-bold tracking-tight">
               Operator access
             </h1>
             <p className="mt-2 font-mono-ds text-sm text-[#6c6c84]">
-              The admin view reads every agent, wallet and transaction in the
-              bank. Enter the operator key to continue.
+              This view reads every agent, wallet and transaction in the bank.
+              It is restricted to a single authorised account.
             </p>
-            <input
-              type="password"
-              value={keyPrompt}
-              onChange={(e) => setKeyPrompt(e.target.value)}
-              placeholder="Admin key"
-              autoComplete="off"
-              className="mt-6 w-full rounded-lg border border-[#1a1a2e] bg-[#0b0b14] px-4 py-3 font-mono-ds text-sm text-[#d0d0e0] outline-none focus:border-[#e8ff47]"
-            />
+
             {authError && (
-              <p className="mt-3 font-mono-ds text-sm text-[#ff6b6b]">{authError}</p>
+              <p className="mt-4 rounded-lg border border-[#ff6b6b]/30 bg-[#ff6b6b]/10 px-4 py-3 font-mono-ds text-sm text-[#ff6b6b]">
+                {authError}
+              </p>
             )}
-            <button
-              type="submit"
-              className="mt-4 w-full rounded-lg bg-[#e8ff47] px-4 py-3 font-display text-sm font-bold text-[#0b0b14] transition hover:opacity-90"
-            >
-              Unlock
-            </button>
-            <p className="mt-4 font-mono-ds text-xs text-[#4a4a5e]">
-              Held in this tab only, and cleared when it closes.
-            </p>
-          </form>
+
+            {session.sso_configured ? (
+              <>
+                <a
+                  href="/api/admin/auth/login"
+                  className="mt-6 flex w-full items-center justify-center gap-3 rounded-lg bg-[#e8ff47] px-4 py-3 font-display text-sm font-bold text-[#0b0b14] transition hover:opacity-90"
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                    <path fill="#0b0b14" d="M21.35 11.1H12v2.98h5.35c-.23 1.4-1.66 4.1-5.35 4.1a5.9 5.9 0 0 1 0-11.8c1.7 0 2.83.72 3.48 1.34l2.37-2.29C16.4 3.9 14.42 3 12 3a9 9 0 1 0 0 18c5.2 0 8.64-3.65 8.64-8.8 0-.59-.06-1.04-.29-2.1Z" />
+                  </svg>
+                  Sign in with Google
+                </a>
+                <p className="mt-4 font-mono-ds text-xs text-[#4a4a5e]">
+                  Authorised: {session.allowed.join(', ')}
+                </p>
+              </>
+            ) : (
+              <div className="mt-6 rounded-lg border border-[#1a1a2e] bg-[#0b0b14] px-4 py-4">
+                <p className="font-mono-ds text-sm text-[#6c6c84]">
+                  Google sign-in is not configured on this deployment. Set{' '}
+                  <span className="text-[#e8ff47]">GOOGLE_CLIENT_ID</span> and{' '}
+                  <span className="text-[#e8ff47]">GOOGLE_CLIENT_SECRET</span>{' '}
+                  in the Vercel project, then redeploy.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     )
@@ -218,6 +237,17 @@ export default function Admin() {
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h1 className="font-display text-xl font-bold tracking-tight">MogBank Admin</h1>
+              {session?.email && (
+                <span className="font-mono-ds text-xs text-[#6c6c84]">
+                  {session.email}
+                  <button
+                    onClick={signOut}
+                    className="ml-3 text-[#e8ff47] underline-offset-2 hover:underline"
+                  >
+                    sign out
+                  </button>
+                </span>
+              )}
               <Badge tone="red">HUMAN — READ ONLY</Badge>
             </div>
             <div className="flex items-center gap-3 font-mono-ds text-xs text-[#6c6c84]">

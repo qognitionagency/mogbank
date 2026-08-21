@@ -22,6 +22,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { hashApiKey } from '@/lib/crypto'
 import { query } from '@/lib/db'
+import { googleConfig, readSession } from '@/lib/admin-session'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -69,22 +70,6 @@ function readApiKey(request: NextRequest): string | null {
     return authorization.slice(7).trim()
   }
   return null
-}
-
-/**
- * Compare two strings without leaking their common prefix through timing.
- * Used for the admin key, which is a shared secret rather than a hash lookup.
- */
-function timingSafeEqual(a: string, b: string): boolean {
-  const encoder = new TextEncoder()
-  const left = encoder.encode(a)
-  const right = encoder.encode(b)
-  // Length is not secret, but bail out in constant time relative to `left`.
-  let mismatch = left.length ^ right.length
-  for (let i = 0; i < left.length; i++) {
-    mismatch |= left[i] ^ (right[i] ?? 0)
-  }
-  return mismatch === 0
 }
 
 // ---------------------------------------------------------------------------
@@ -252,31 +237,49 @@ export function requireSelf(
 // ---------------------------------------------------------------------------
 
 /**
- * Require the operator's admin key.
+ * Require the operator.
  *
  * This is the human monitoring tier, deliberately separate from agent keys —
- * no agent credential should ever read the whole bank. With ADMIN_API_KEY
- * unset the surface is closed rather than open, so a missing environment
- * variable cannot silently publish every agent, wallet and transaction.
+ * no agent credential should ever read the whole bank.
+ *
+ * Access is bound to a *person*, not to a secret: the caller must hold a
+ * session issued by Google sign-in for an address on the allowlist, which is
+ * a single operator by default. There is deliberately no shared admin key —
+ * a key authenticates whoever is holding it, which is precisely the property
+ * we do not want for the account that can see every agent's money.
+ *
+ * Fails closed at every step: unconfigured SSO returns 503 rather than
+ * opening, and the allowlist is re-checked on each request so revoking an
+ * address takes effect immediately.
  */
-export function requireAdmin(request: NextRequest): AuthFailure | null {
-  const expected = process.env.ADMIN_API_KEY
-  if (!expected) {
+export async function requireAdmin(
+  request: NextRequest
+): Promise<AuthFailure | null> {
+  if (!googleConfig(request)) {
     return deny(
       503,
-      'ADMIN_DISABLED',
-      'Admin access is not configured on this deployment.'
+      'ADMIN_SSO_NOT_CONFIGURED',
+      'Admin sign-in is not configured on this deployment.',
+      { missing: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'] }
     )
   }
 
-  const presented =
-    request.headers.get('x-admin-key')?.trim() ||
-    (request.headers.get('authorization')?.toLowerCase().startsWith('bearer ')
-      ? request.headers.get('authorization')!.slice(7).trim()
-      : null)
-
-  if (!presented || !timingSafeEqual(expected, presented)) {
-    return deny(401, 'UNAUTHENTICATED', 'A valid admin key is required.')
+  const session = await readSession(request)
+  if (!session) {
+    return deny(
+      401,
+      'UNAUTHENTICATED',
+      'Sign in with an authorised Google account.',
+      { sign_in: '/api/admin/auth/login' }
+    )
   }
   return null
+}
+
+/** The signed-in operator, for attributing actions in the audit trail. */
+export async function currentAdmin(
+  request: NextRequest
+): Promise<string | null> {
+  const session = await readSession(request)
+  return session?.email ?? null
 }
