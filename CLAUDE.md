@@ -62,8 +62,8 @@ db/
 - **Database:** Neon `ep-odd-cherry-axa8rct2` (us-east-2), always via the
   **pooler** host.
 - **Env vars** (Vercel, all three targets): `DATABASE_URL`, `ADMIN_API_KEY`,
-  `NEXT_PUBLIC_ABOS_VERSION`, `NEXT_PUBLIC_PROVIDER`, `NEXT_PUBLIC_X402_ENABLED`,
-  `NEXT_PUBLIC_TESTNET_FAUCET_AMOUNT`.
+  `CREDENTIAL_ISSUER_SEED`, `NEXT_PUBLIC_ABOS_VERSION`, `NEXT_PUBLIC_PROVIDER`,
+  `NEXT_PUBLIC_X402_ENABLED`, `NEXT_PUBLIC_TESTNET_FAUCET_AMOUNT`.
 - **Admin access:** open `/admin`, paste the `ADMIN_API_KEY` value. Held in
   `sessionStorage` for that tab only.
 
@@ -136,6 +136,12 @@ releases pay the seller once.
       records entries on `transactions` via the `ledger_entry` discriminator).
 - [ ] **`GET /api/v1/wallets/{id}` does not exist**, though `/ledger` and
       `/transactions` nest under it. Nothing calls it; add it for symmetry.
+- [ ] **Verifiable credentials issued before 2026-08-21 are forgeable.** They
+      were signed with a key derived from a hardcoded fallback string, because
+      the seed variable they referenced had been removed. The issuer now has
+      `CREDENTIAL_ISSUER_SEED` and refuses to sign in production without it —
+      but the issuer public key has therefore changed, so any credential handed
+      out earlier will no longer verify and should be reissued.
 - [ ] **Escrow refund policy.** Only the buyer can release or refund. A seller
       who delivers has no recourse if the buyer refunds — there is no delivery
       signal or arbitration. Fine for testnet; decide before real value.

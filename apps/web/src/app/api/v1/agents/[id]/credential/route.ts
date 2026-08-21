@@ -6,11 +6,30 @@ import nacl from 'tweetnacl'
 
 export const dynamic = 'force-dynamic'
 
-// MogBank issuer key — derived deterministically from env secret so it's
-// stable across Vercel instances without a separate key-management service.
+/**
+ * MogBank's credential-issuing key, derived deterministically from a secret so
+ * it is stable across serverless instances without a key-management service.
+ *
+ * The seed used to be `SUPABASE_SERVICE_ROLE_KEY`, falling back to the literal
+ * string 'mogbank-dev-issuer'. That variable no longer exists, so every
+ * credential was being signed with a key anyone reading this file could
+ * reproduce. It now has a variable of its own and refuses to sign in
+ * production without it, rather than quietly issuing forgeable credentials.
+ */
 function getIssuerKey(): { privateKey: string; publicKey: string } {
-  const seed = process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'mogbank-dev-issuer'
-  const seedBytes = new TextEncoder().encode(seed.slice(0, 32).padEnd(32, '0'))
+  const seed = process.env.CREDENTIAL_ISSUER_SEED
+  if (!seed) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'Missing env.CREDENTIAL_ISSUER_SEED — refusing to sign credentials with a well-known key'
+      )
+    }
+    console.warn(
+      'CREDENTIAL_ISSUER_SEED is unset; signing with an insecure development key.'
+    )
+  }
+  const material = seed ?? 'mogbank-development-issuer-not-for-production'
+  const seedBytes = new TextEncoder().encode(material.slice(0, 32).padEnd(32, '0'))
   const kp = nacl.sign.keyPair.fromSeed(seedBytes)
   const toB64 = (b: Uint8Array) => Buffer.from(b).toString('base64')
   return { privateKey: toB64(kp.secretKey), publicKey: toB64(kp.publicKey) }
