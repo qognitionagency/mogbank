@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:smoke": "node --import ./scripts/register-alias.mjs scripts/db-smoke.mts",
-    "db:race": "node --import ./scripts/register-alias.mjs scripts/ledger-race.mts"
+    "db:smoke": "node --env-file-if-exists=.env.local --import ./scripts/register-alias.mjs scripts/db-smoke.mts",
+    "db:race": "node --env-file-if-exists=.env.local --import ./scripts/register-alias.mjs scripts/ledger-race.mts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

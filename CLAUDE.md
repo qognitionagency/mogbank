@@ -89,9 +89,12 @@ Verify both with:
 
 ```bash
 cd apps/web
-DATABASE_URL="…" npm run db:smoke   # 30 data-layer assertions
-DATABASE_URL="…" npm run db:race    # 29 concurrency assertions
+npm run db:smoke   # 30 data-layer assertions
+npm run db:race    # 29 concurrency assertions
 ```
+
+Both read `apps/web/.env.local` automatically, so they need no exported
+environment. They create and clean up their own rows.
 
 `db:race` is the one that matters: 40 concurrent transfers conserve money; 10
 concurrent transfers of 100 against a balance of 500 leave exactly 5 winners
@@ -107,15 +110,17 @@ releases pay the seller once.
 - [ ] **Rotate the Neon password.** `npg_TY6msStHW4Uc` was shared in plaintext
       in chat. Neon → Roles → reset `neondb_owner`, then update `DATABASE_URL`
       in Vercel and in `apps/web/.env.local`.
-- [ ] **Move this repo out of the cloud-synced folder.** `~/Documents/GitHub`
+- [x] **Moved out of the cloud-synced folder.** The working copy is now
+      `~/dev/mogbank`. The old `~/Documents/GitHub/mogbank` was left in place,
+      untouched, and can be deleted once you are satisfied — but do not work in
+      it. Background: `~/Documents/GitHub`
       is managed by a file-provider sync daemon that is malfunctioning: it
       pegged `fileproviderd` at ~90% CPU, made `git status`/`commit` hang for
       minutes, created `… 2` conflict copies inside `.git/`, and evicted
       `.git/HEAD` and `.git/config` to "dataless" placeholders it could not
-      materialise — which made `git log` die with SIGBUS. Recovering meant
-      recreating those two files by hand. Move to e.g. `~/dev/mogbank` and
-      re-clone. **Nothing was lost** (GitHub has every commit), but it will
-      keep happening here.
+      materialise — which made `git log` die with SIGBUS, and every working
+      tree file fail to index with "short read". **Nothing was lost**: GitHub
+      had every commit, and the current tree was rebuilt from a fresh clone.
 
 ### Correctness
 
